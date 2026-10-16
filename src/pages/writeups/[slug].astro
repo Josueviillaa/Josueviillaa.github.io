@@ -1,0 +1,24 @@
+---
+import { render } from 'astro:content';
+import WriteupLayout from '../../layouts/WriteupLayout.astro';
+import Terminal from '../../components/writeup/Terminal.astro';
+import Lesson from '../../components/writeup/Lesson.astro';
+import { getWriteups, type Writeup } from '../../lib/writeups';
+
+export async function getStaticPaths() {
+  const entries = await getWriteups();
+  return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+interface Props {
+  entry: Writeup;
+}
+
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+---
+
+<WriteupLayout entry={entry} headings={headings}>
+  <!-- Componentes disponibles en cualquier .mdx sin importarlos -->
+  <Content components={{ Terminal, Lesson }} />
+</WriteupLayout>

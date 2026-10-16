@@ -1,0 +1,52 @@
+---
+import Icon from './Icon.astro';
+---
+
+<!--
+  El icono visible es el del tema AL QUE cambias (sol en oscuro, luna en claro).
+  Lo decide CSS con los tokens --show-if-dark / --show-if-light, así que es
+  correcto desde el primer pintado, sin esperar a JavaScript.
+-->
+<button
+  type="button"
+  data-theme-toggle
+  aria-label="Cambiar tema"
+  class="inline-flex size-9 items-center justify-center rounded-md border border-line text-muted transition-colors hover:border-line-strong hover:text-text"
+>
+  <Icon name="sun" class="if-dark" />
+  <Icon name="moon" class="if-light" />
+</button>
+
+<script>
+  const root = document.documentElement;
+  const prefersLight = window.matchMedia('(prefers-color-scheme: light)');
+
+  const current = () => root.dataset.theme ?? (prefersLight.matches ? 'light' : 'dark');
+
+  const buttons = document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]');
+
+  function syncLabels() {
+    const label = current() === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro';
+    buttons.forEach((btn) => {
+      btn.setAttribute('aria-label', label);
+      btn.title = label;
+    });
+  }
+
+  buttons.forEach((btn) =>
+    btn.addEventListener('click', () => {
+      // La elección explícita se guarda y gana a la preferencia del SO.
+      const next = current() === 'dark' ? 'light' : 'dark';
+      root.dataset.theme = next;
+      try {
+        localStorage.setItem('theme', next);
+      } catch {
+        /* almacenamiento bloqueado: el cambio dura hasta recargar */
+      }
+      syncLabels();
+    }),
+  );
+
+  prefersLight.addEventListener('change', syncLabels);
+  syncLabels();
+</script>

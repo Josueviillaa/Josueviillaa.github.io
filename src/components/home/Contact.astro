@@ -1,0 +1,43 @@
+---
+import SectionHeader from '../SectionHeader.astro';
+import CopyEmail from '../CopyEmail.astro';
+import { site, githubUrl, linkedinUrl } from '../../config/site';
+// TODO(Josu): email y usuarios se editan en src/config/site.ts
+---
+
+<section id="contacto">
+  <div class="wrap py-20 sm:py-24">
+    <SectionHeader n="05" label="contacto" title="Hablemos" />
+
+    <div class="grid gap-10 md:grid-cols-[1fr_1.2fr]">
+      <!-- TODO(Josu): ajusta esta frase a lo que estés buscando -->
+      <p class="max-w-md text-lg text-muted">
+        Si tienes un puesto, unas prácticas o un proyecto en el que encaje un perfil junior con método y ganas de aprender,
+        escríbeme. Respondo por email o LinkedIn.
+      </p>
+
+      <dl class="border-t border-line font-mono text-[0.8125rem]">
+        <div class="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 border-b border-line py-4">
+          <dt class="text-faint">email</dt>
+          <dd class="min-w-0"><CopyEmail email={site.email} /></dd>
+        </div>
+        <div class="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 border-b border-line py-4">
+          <dt class="text-faint">github</dt>
+          <dd class="min-w-0 break-all">
+            <a href={githubUrl} target="_blank" rel="noopener noreferrer" class="link">
+              github.com/{site.links.github}
+            </a>
+          </dd>
+        </div>
+        <div class="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 border-b border-line py-4">
+          <dt class="text-faint">linkedin</dt>
+          <dd class="min-w-0 break-all">
+            <a href={linkedinUrl} target="_blank" rel="noopener noreferrer" class="link">
+              linkedin.com/in/{site.links.linkedin}
+            </a>
+          </dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+</section>

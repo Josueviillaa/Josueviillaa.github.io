@@ -1,0 +1,44 @@
+---
+/**
+ * Ventana de terminal para comandos y salidas destacadas.
+ * Uso en .mdx (sin import):
+ *
+ *   <Terminal title="nmap · searcher.htb">
+ *
+ *   ```bash
+ *   nmap -sCV -p22,80 10.10.11.208
+ *   ```
+ *
+ *   </Terminal>
+ */
+interface Props {
+  title?: string;
+}
+
+const { title = 'terminal' } = Astro.props;
+---
+
+<figure class="terminal overflow-hidden rounded-md border border-line bg-surface">
+  <figcaption
+    class="flex items-center gap-2 border-b border-line bg-raised px-4 py-2 font-mono text-xs text-faint"
+  >
+    <span class="text-accent" aria-hidden="true">&gt;_</span>
+    <span class="truncate">{title}</span>
+  </figcaption>
+  <div class="terminal-body">
+    <slot />
+  </div>
+</figure>
+
+<style>
+  .terminal-body :global(pre) {
+    margin: 0;
+    padding: 1rem 1.125rem;
+    border: 0;
+    border-radius: 0;
+    overflow-x: auto;
+  }
+  .terminal-body :global(pre + pre) {
+    border-top: 1px dashed var(--line);
+  }
+</style>

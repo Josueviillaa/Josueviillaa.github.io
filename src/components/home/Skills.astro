@@ -1,0 +1,42 @@
+---
+import SectionHeader from '../SectionHeader.astro';
+import { skills } from '../../data/skills';
+// TODO(Josu): las categorías y ejemplos se editan en src/data/skills.ts
+
+// La última celda se estira para cerrar la fila incompleta del grid.
+const n = skills.length;
+const lastSpan = [
+  n % 2 === 1 ? 'sm:col-span-2' : '',
+  n % 3 === 0 ? 'lg:col-span-1' : n % 3 === 1 ? 'lg:col-span-3' : 'lg:col-span-2',
+].join(' ');
+---
+
+<section id="skills" class="border-b border-line">
+  <div class="wrap py-20 sm:py-24">
+    <SectionHeader
+      n="02"
+      label="skills"
+      title="Skills y stack"
+      intro="Áreas y herramientas con las que trabajo en laboratorios y máquinas."
+    />
+
+    <div class="grid border-t border-l border-line sm:grid-cols-2 lg:grid-cols-3">
+      {
+        skills.map((group, i) => (
+          <div class:list={['border-r border-b border-line p-6', i === n - 1 && lastSpan]}>
+            <p class="font-mono text-xs text-faint">
+              <span class="text-accent">/</span>
+              {group.key}
+            </p>
+            <h3 class="mt-1.5 text-lg font-semibold">{group.title}</h3>
+            <ul class="mt-4 flex flex-wrap gap-1.5">
+              {group.items.map((item) => (
+                <li class="rounded-sm border border-line px-2 py-1 font-mono text-xs text-muted">{item}</li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

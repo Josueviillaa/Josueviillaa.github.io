@@ -1,0 +1,70 @@
+---
+import type { Cert, CertStatus } from '../data/certs';
+import Icon from './Icon.astro';
+
+interface Props {
+  cert: Cert;
+}
+
+const { cert } = Astro.props;
+
+const status: Record<CertStatus, { label: string; cls: string; edge: string }> = {
+  obtenida: { label: 'obtenida', cls: 'border-accent/40 bg-accent-soft text-accent', edge: 'border-l-accent' },
+  'en-curso': { label: 'en curso', cls: 'border-warn/40 bg-warn-soft text-warn', edge: 'border-l-warn' },
+  planificada: { label: 'planificada', cls: 'border-line-strong text-muted', edge: 'border-l-line-strong' },
+};
+const s = status[cert.status];
+---
+
+<article class:list={['rounded-r-lg border border-l-2 border-line bg-surface p-6 sm:p-7', s.edge]}>
+  <div class="flex items-start justify-between gap-4">
+    <div class="min-w-0">
+      <h3 class="text-3xl font-bold">{cert.code}</h3>
+      <p class="mt-1.5 text-sm text-muted">{cert.name}</p>
+      <p class="mt-0.5 font-mono text-xs text-faint">{cert.issuer}{cert.date && ` · ${cert.date}`}</p>
+    </div>
+    <span
+      class:list={[
+        'shrink-0 rounded-sm border px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-[0.08em] uppercase',
+        s.cls,
+      ]}
+    >
+      {s.label}
+    </span>
+  </div>
+
+  {
+    cert.flags && (
+      <div class="mt-6">
+        <div class="flex items-baseline justify-between font-mono text-xs">
+          <span class="text-faint">flags capturadas</span>
+          <span class="text-text">
+            {cert.flags.captured}/{cert.flags.total}
+          </span>
+        </div>
+        <div class="mt-2 flex gap-1" role="img" aria-label={`${cert.flags.captured} de ${cert.flags.total} flags`}>
+          {Array.from({ length: cert.flags.total }, (_, i) => (
+            <span class:list={['h-1.5 flex-1 rounded-[1px]', i < cert.flags!.captured ? 'bg-accent' : 'bg-line-strong']} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  {
+    cert.note && <p class="mt-5 text-sm text-muted">{cert.note}</p>
+  }
+
+  {
+    cert.verifyUrl && (
+      <a
+        href={cert.verifyUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="link mt-5 inline-flex items-center gap-1.5 font-mono text-xs"
+      >
+        verificar credencial <Icon name="arrow-right" size={14} />
+      </a>
+    )
+  }
+</article>

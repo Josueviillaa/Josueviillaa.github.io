@@ -1,0 +1,114 @@
+---
+import ThemeToggle from './ThemeToggle.astro';
+import { withBase } from '../lib/url';
+
+interface Props {
+  /** En la home los enlaces son anclas puras; desde un writeup apuntan a la home. */
+  isHome?: boolean;
+}
+
+const { isHome = false } = Astro.props;
+
+const sections = [
+  { id: 'sobre-mi', label: 'sobre mí' },
+  { id: 'skills', label: 'skills' },
+  { id: 'certificaciones', label: 'certs' },
+  { id: 'writeups', label: 'writeups' },
+  { id: 'contacto', label: 'contacto' },
+];
+
+const href = (id: string) => (isHome ? `#${id}` : withBase(`/#${id}`));
+---
+
+<header class="sticky top-0 z-50 border-b border-line bg-bg/85 backdrop-blur-md">
+  <nav class="wrap flex h-(--nav-h) items-center justify-between gap-4" aria-label="Principal">
+    <a href={isHome ? '#top' : withBase('/')} class="font-mono text-sm font-medium text-text">
+      <span class="text-faint">~/</span>josu<span class="cursor" aria-hidden="true"></span>
+    </a>
+
+    <div class="flex items-center gap-6">
+      <ul class="hidden items-center gap-6 font-mono text-[0.8125rem] md:flex">
+        {
+          sections.map((s, i) => (
+            <li>
+              <a href={href(s.id)} data-nav-link={s.id} class="text-muted transition-colors hover:text-text">
+                <span class="text-faint">{String(i + 1).padStart(2, '0')}.</span>
+                {s.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+
+      <div class="flex items-center gap-2">
+        <ThemeToggle />
+        <button
+          type="button"
+          data-menu-button
+          aria-expanded="false"
+          aria-controls="nav-menu"
+          class="inline-flex h-9 items-center rounded-md border border-line px-3 font-mono text-xs text-muted transition-colors hover:text-text md:hidden"
+        >
+          menú
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div id="nav-menu" hidden class="border-t border-line md:hidden">
+    <ul class="wrap flex flex-col py-2 font-mono text-sm">
+      {
+        sections.map((s, i) => (
+          <li>
+            <a href={href(s.id)} data-nav-link={s.id} class="flex gap-3 py-2.5 text-muted hover:text-text">
+              <span class="text-faint">{String(i + 1).padStart(2, '0')}.</span>
+              {s.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</header>
+
+<script>
+  // Menú móvil
+  const button = document.querySelector<HTMLButtonElement>('[data-menu-button]');
+  const menu = document.getElementById('nav-menu');
+
+  function setOpen(open: boolean) {
+    if (!button || !menu) return;
+    button.setAttribute('aria-expanded', String(open));
+    button.textContent = open ? 'cerrar' : 'menú';
+    menu.hidden = !open;
+  }
+
+  button?.addEventListener('click', () => setOpen(button.getAttribute('aria-expanded') !== 'true'));
+  menu?.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => setOpen(false)));
+  document.addEventListener('keydown', (e) => e.key === 'Escape' && setOpen(false));
+
+  // Resalta la sección visible
+  const links = document.querySelectorAll<HTMLAnchorElement>('[data-nav-link]');
+  const targets = [...new Set([...links].map((l) => l.dataset.navLink))]
+    .map((id) => document.getElementById(id!))
+    .filter((el): el is HTMLElement => el !== null);
+
+  if (targets.length) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          links.forEach((l) => {
+            const active = l.dataset.navLink === entry.target.id;
+            l.classList.toggle('text-accent', active);
+            l.classList.toggle('text-muted', !active);
+            if (active) l.setAttribute('aria-current', 'true');
+            else l.removeAttribute('aria-current');
+          });
+        });
+      },
+      { rootMargin: '-40% 0px -55% 0px' },
+    );
+    targets.forEach((t) => observer.observe(t));
+  }
+</script>

@@ -1,0 +1,72 @@
+---
+/**
+ * Email como texto seleccionable + botón de copiar.
+ * Sin mailto: muchos reclutadores no tienen cliente de correo configurado.
+ */
+interface Props {
+  email: string;
+  class?: string;
+}
+
+const { email, class: className } = Astro.props;
+---
+
+<div
+  data-copy-email
+  class:list={[
+    'inline-flex max-w-full items-stretch overflow-hidden rounded-md border border-line bg-surface font-mono text-[0.8125rem]',
+    className,
+  ]}
+>
+  <span data-copy-text class="min-w-0 select-all px-3 py-2 break-all text-text">{email}</span>
+  <button
+    type="button"
+    data-copy-button
+    class="shrink-0 border-l border-line px-3 text-muted transition-colors hover:bg-raised hover:text-accent"
+    aria-label={`Copiar ${email} al portapapeles`}
+  >
+    <span data-copy-label>copiar</span>
+  </button>
+  <span data-copy-status class="sr-only" aria-live="polite"></span>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-copy-email]').forEach((root) => {
+    const text = root.querySelector<HTMLElement>('[data-copy-text]')!;
+    const button = root.querySelector<HTMLButtonElement>('[data-copy-button]')!;
+    const label = root.querySelector<HTMLElement>('[data-copy-label]')!;
+    const status = root.querySelector<HTMLElement>('[data-copy-status]')!;
+    let timer: number | undefined;
+
+    function selectText() {
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+
+    function flash(msg: string, ok: boolean) {
+      label.textContent = msg;
+      status.textContent = ok ? 'Email copiado al portapapeles' : 'Email seleccionado, pulsa Ctrl+C para copiarlo';
+      button.classList.toggle('text-accent', ok);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        label.textContent = 'copiar';
+        button.classList.remove('text-accent');
+      }, 1800);
+    }
+
+    button.addEventListener('click', async () => {
+      const value = text.textContent?.trim() ?? '';
+      try {
+        await navigator.clipboard.writeText(value);
+        flash('copiado', true);
+      } catch {
+        // Sin API de portapapeles (http, permisos…): dejamos el texto seleccionado.
+        selectText();
+        flash('ctrl+c', false);
+      }
+    });
+  });
+</script>

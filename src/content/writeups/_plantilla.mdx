@@ -1,0 +1,61 @@
+---
+# ============================================================
+#  PLANTILLA — copia este archivo para añadir una máquina.
+#  El prefijo "_" hace que se ignore (no se publica).
+#  Pasos:
+#    1. Copia este archivo como src/content/writeups/<nombre>.mdx
+#       (sin "_"). El nombre del archivo es el slug de la URL.
+#    2. Rellena el frontmatter de abajo.
+#    3. Escribe el cuerpo: cada "## " es una fase y se numera sola.
+#  Componentes disponibles SIN importar: <Terminal>, <Lesson>.
+# ============================================================
+title: Nombre de la máquina
+platform: HackTheBox
+os: Linux          # Linux | Windows | FreeBSD | OpenBSD | Otro
+difficulty: Easy   # Easy | Medium | Hard | Insane
+date: 2026-01-01   # AAAA-MM-DD
+ports: ["22/ssh", "80/http"]
+tags:
+  - Técnica 1
+  - Técnica 2
+summary: Una o dos frases que resuman el camino hasta root. Aparece en la tarjeta de la home.
+retired: true      # máquina retirada (recomendado por el aviso educativo)
+draft: true        # true = no se publica; ponlo en false cuando esté listo
+---
+
+## Reconocimiento
+
+Qué puertos y servicios encontraste y qué te llevó al siguiente paso.
+
+<Terminal title="nmap · maquina.htb">
+
+```text
+PORT   STATE SERVICE VERSION
+...
+```
+
+</Terminal>
+
+<Lesson>
+
+Qué aprendiste en esta fase.
+
+</Lesson>
+
+## Foothold
+
+Cómo conseguiste el primer acceso. Explica el **concepto** del vector; no publiques payloads listos para copiar ni credenciales reales.
+
+## User
+
+Movimiento lateral o acceso al usuario con shell.
+
+## Root
+
+La escalada final de privilegios.
+
+<Lesson>
+
+La lección principal de la escalada.
+
+</Lesson>

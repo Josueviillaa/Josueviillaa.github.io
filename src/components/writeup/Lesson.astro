@@ -1,0 +1,35 @@
+---
+/**
+ * Caja de "Lección aprendida" al final de cada fase.
+ * Uso en .mdx (sin import):
+ *
+ *   <Lesson>
+ *
+ *   Texto en **Markdown**.
+ *
+ *   </Lesson>
+ */
+interface Props {
+  title?: string;
+}
+
+const { title = 'Lección aprendida' } = Astro.props;
+---
+
+<aside class="lesson rounded-r-md border border-l-2 border-line border-l-accent bg-surface px-5 py-4">
+  <p class="font-mono text-[0.6875rem] font-medium tracking-[0.12em] text-accent uppercase">{title}</p>
+  <div class="lesson-body mt-2">
+    <slot />
+  </div>
+</aside>
+
+<style>
+  .lesson-body :global(p),
+  .lesson-body :global(li) {
+    color: var(--text);
+    font-size: 0.975rem;
+  }
+  .lesson-body > :global(* + *) {
+    margin-top: 0.6em;
+  }
+</style>

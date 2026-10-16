@@ -1,0 +1,33 @@
+---
+import SectionHeader from '../SectionHeader.astro';
+import MachineCard from '../MachineCard.astro';
+import { getWriteups } from '../../lib/writeups';
+
+// Alimentado por la content collection: añade un .mdx en src/content/writeups/
+const writeups = await getWriteups();
+---
+
+<section id="writeups" class="border-b border-line">
+  <div class="wrap py-20 sm:py-24">
+    <SectionHeader
+      n="04"
+      label="writeups"
+      title="Máquinas resueltas"
+      intro="Writeups de máquinas retiradas de HackTheBox: enumeración, vector de entrada, escalada y lo que aprendí en cada fase."
+    />
+
+    {
+      writeups.length ? (
+        <ul class="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
+          {writeups.map((entry) => (
+            <li>
+              <MachineCard entry={entry} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p class="font-mono text-sm text-faint">Aún no hay writeups publicados.</p>
+      )
+    }
+  </div>
+</section>

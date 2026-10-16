@@ -1,0 +1,109 @@
+---
+title: Searcher
+platform: HackTheBox
+os: Linux
+difficulty: Easy
+# TODO(Josu): fecha de publicación del writeup (AAAA-MM-DD)
+date: 2026-10-16
+ports: ["22/ssh", "80/http"]
+tags:
+  - Flask
+  - Searchor 2.4.0
+  - Inyección en eval()
+  - .git expuesto
+  - Reutilización de credenciales
+  - sudo
+  - Path hijacking
+summary: Una librería Python vulnerable da ejecución remota, unas credenciales olvidadas en un repositorio Git abren sudo, y un script privilegiado que resuelve rutas relativas termina en root.
+---
+
+## Reconocimiento
+
+El escaneo de puertos muestra una superficie pequeña: SSH y un servidor web Apache que redirige a un nombre de host virtual.
+
+<Terminal title="nmap · 10.10.11.208">
+
+```text
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 8.9p1 Ubuntu 3ubuntu0.1
+80/tcp open  http    Apache httpd 2.4.52
+|_http-title: Did not follow redirect to http://searcher.htb/
+```
+
+</Terminal>
+
+Tras añadir `searcher.htb` al fichero de hosts, la web responde: una aplicación **Flask** que actúa como buscador. Introduces un motor y una consulta, y el servidor genera una URL de búsqueda. El pie de página revela la pieza clave: funciona sobre la librería **Searchor, versión 2.4.0**.
+
+Con el nombre del componente y su versión exacta, el siguiente paso es buscar vulnerabilidades conocidas de esa versión concreta en lugar de tocar la aplicación a ciegas.
+
+<Lesson>
+
+El primer objetivo de la enumeración web no es "encontrar un fallo", es **identificar el software y su versión**. Un framework, una librería y un número de versión bastan para orientar toda la fase siguiente. Anota siempre lo que delata el pie de página, las cabeceras HTTP y los ficheros estáticos.
+
+</Lesson>
+
+## Foothold — ejecución a través de `eval()`
+
+Searchor 2.4.0 construye la URL de búsqueda interpolando la consulta del usuario dentro de una cadena que luego se pasa a **`eval()`**. El problema conceptual es clásico: datos controlados por el usuario que acaban evaluados como código Python en el servidor.
+
+Como la entrada del formulario termina dentro de esa expresión, se puede **romper el contexto de la cadena** y conseguir que el intérprete ejecute una llamada propia en lugar de limitarse a formatear una URL. El resultado es ejecución remota de comandos con el usuario del servicio web.
+
+El flujo del ataque, a alto nivel:
+
+1. Identificar el parámetro del formulario que llega a `eval()`.
+2. Cerrar la expresión original para que lo que sigue se evalúe como código.
+3. Invocar la ejecución de un comando del sistema que devuelva una shell hacia tu equipo.
+4. Ponerte a la escucha en tu máquina y lanzar la petición para recibir la conexión.
+
+No incluyo el payload montado: el concepto —entrada de usuario que alcanza `eval()`— es lo que importa, y reconstruirlo es trivial una vez entendido el punto de inyección.
+
+<Lesson>
+
+`eval()` sobre datos de usuario es ejecución de código, nunca "formateo". La defensa no es filtrar comillas, sino **no evaluar entrada nunca**: usar APIs que construyan la URL con parámetros ya escapados. Cuando audites código Python, `eval`, `exec` y `os.system` con variables dentro son banderas rojas inmediatas.
+
+</Lesson>
+
+## User — credenciales reutilizadas en un `.git` expuesto
+
+Ya dentro como el usuario del servicio, toca enumerar el sistema de ficheros del proyecto desplegado. En el directorio de la aplicación aparece un repositorio **Git** con su carpeta de metadatos accesible.
+
+El historial y la configuración de un repositorio guardan más de lo que la gente recuerda. Aquí el fichero de configuración del repo contiene **credenciales incrustadas** —puestas en su día para automatizar un `push`— que resultan ser válidas también para un usuario del sistema.
+
+Ese es todo el vector: no hay exploit, hay **reutilización de credenciales**. La misma contraseña sirve para el repositorio y para iniciar sesión como el usuario con acceso interactivo, lo que da un punto de apoyo estable por SSH.
+
+<Lesson>
+
+Revisa siempre `.git/config`, el historial de commits y los ficheros de entorno de cualquier proyecto desplegado: son un depósito habitual de secretos. Y desde el lado defensivo, **una credencial nunca debe vivir en el control de versiones**; para eso están los gestores de secretos y las variables de entorno fuera del repo.
+
+</Lesson>
+
+## Root — path hijacking en un script de `sudo`
+
+Con sesión como el usuario, el primer reflejo de escalada es comprobar qué se puede ejecutar como `root` sin contraseña.
+
+<Terminal title="enumeración de sudo">
+
+```bash
+sudo -l
+```
+
+</Terminal>
+
+El resultado permite ejecutar un **script** como `root`. Al leerlo se ve que invoca una herramienta auxiliar **por su nombre relativo**, sin ruta absoluta, confiando en que el `PATH` la resuelva.
+
+Ahí está el fallo: cuando un proceso privilegiado llama a un binario sin ruta completa, **tú controlas qué se ejecuta** si consigues que tu directorio aparezca antes en el `PATH`. El patrón de la escalada:
+
+1. Crear en un directorio donde puedas escribir un ejecutable con el **mismo nombre** que la herramienta que el script busca.
+2. Hacer que ese ejecutable lance una shell.
+3. Anteponer tu directorio al `PATH` en la invocación de `sudo`, de modo que el script privilegiado encuentre tu versión primero.
+4. Al ejecutar el script como `root`, es tu binario el que corre — con privilegios de `root`.
+
+<Lesson>
+
+Un binario llamado sin ruta absoluta dentro de un contexto privilegiado es una escalada esperando a ocurrir. Defensa: en cualquier script que corra como `root`, usa **rutas absolutas** para todo ejecutable y fija un `PATH` seguro al principio. Ofensiva: cuando `sudo -l` te dé un script, léelo entero y busca nombres de comando "desnudos".
+
+</Lesson>
+
+---
+
+**Recorrido completo:** versión de una librería → RCE por `eval()` → secreto en el repositorio → reutilización de credenciales → `sudo` con ruta relativa → root. Cuatro fases y ni un solo 0-day: todo son **errores de configuración y de higiene de secretos** encadenados, que es justo lo que hace a esta máquina un buen ejercicio de método.

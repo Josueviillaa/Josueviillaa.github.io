@@ -1,0 +1,26 @@
+---
+import type { Difficulty } from '../lib/writeups';
+
+interface Props {
+  level: Difficulty;
+}
+
+const { level } = Astro.props;
+
+// Colores semánticos: easy → acento, medium → warn, hard/insane → crítico
+const styles: Record<Difficulty, string> = {
+  Easy: 'border-accent/40 bg-accent-soft text-accent',
+  Medium: 'border-warn/40 bg-warn-soft text-warn',
+  Hard: 'border-crit/40 bg-crit-soft text-crit',
+  Insane: 'border-crit bg-crit text-bg',
+};
+---
+
+<span
+  class:list={[
+    'inline-flex items-center rounded-sm border px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-[0.08em] uppercase',
+    styles[level],
+  ]}
+>
+  {level}
+</span>
