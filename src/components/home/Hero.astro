@@ -11,7 +11,7 @@ const earned = certs.filter((c) => c.status === 'obtenida').map((c) => c.code);
 // Ficha del panel "terminal": todo sale de config/datos, nada inventado aquí.
 const profile = [
   ['rol', 'pentester junior'],
-  ['formación', 'máster en ciberseguridad · en curso'],
+  ['formación', 'máster en ciberseguridad & ia · evolve'],
   ['certs', earned.length ? earned.join(', ') : '—'],
   ['writeups', `${writeups.length} ${writeups.length === 1 ? 'máquina' : 'máquinas'} · HTB`],
 ];
@@ -29,14 +29,16 @@ const profile = [
     <div class="min-w-0">
       <p class="flex items-center gap-2.5 font-mono text-xs text-muted">
         <span class="status-dot" aria-hidden="true"></span>
-        <span>{site.status}</span>
+        <span data-rotate="status" class="transition-opacity duration-500">{site.statuses[0]}</span>
       </p>
 
       <h1 class="mt-6 text-6xl font-bold sm:text-7xl">{site.name}</h1>
 
       <p class="mt-4 font-display text-lg font-medium text-text sm:text-xl">{site.role}</p>
 
-      <p class="mt-5 max-w-xl text-lg text-muted">{site.pitch}</p>
+      <p class="mt-5 max-w-xl text-lg text-muted">
+        <span data-rotate="pitch" class="transition-opacity duration-500">{site.pitches[0]}</span>
+      </p>
 
       <div class="mt-9 flex flex-wrap items-center gap-3">
         <a
@@ -81,3 +83,26 @@ const profile = [
     </div>
   </div>
 </section>
+
+<script define:vars={{ pitches: site.pitches, statuses: site.statuses }}>
+  // Rota el texto de los elementos [data-rotate] con un fade suave.
+  // Se desactiva si el usuario prefiere menos movimiento (accesibilidad).
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  const sources = { pitch: pitches, status: statuses };
+
+  document.querySelectorAll('[data-rotate]').forEach((el) => {
+    const list = sources[el.dataset.rotate];
+    if (reduce.matches || !Array.isArray(list) || list.length < 2) return;
+
+    let i = 0;
+    setInterval(() => {
+      el.style.opacity = '0';
+      setTimeout(() => {
+        i = (i + 1) % list.length;
+        el.textContent = list[i];
+        el.style.opacity = '1';
+      }, 500); // coincide con la duración del fade
+    }, 4800);
+  });
+</script>
