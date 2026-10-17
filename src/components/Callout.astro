@@ -1,0 +1,51 @@
+---
+/**
+ * Caja de aviso para usar dentro de los writeups (.mdx).
+ * Se importa en el .mdx:  import Callout from "../../components/Callout.astro";
+ * y se usa:  <Callout type="tip">texto en **markdown**</Callout>
+ *
+ * Variantes:
+ *   tip     → acento (cian)      · consejo / truco
+ *   note    → neutro             · aclaración
+ *   warning → warn (ámbar)       · aviso importante
+ */
+type CalloutType = 'tip' | 'note' | 'warning';
+
+interface Props {
+  type?: CalloutType;
+  /** Etiqueta personalizada; por defecto la del tipo */
+  title?: string;
+}
+
+const { type = 'note', title } = Astro.props;
+
+const variants: Record<CalloutType, { edge: string; label: string; defaultLabel: string }> = {
+  tip: { edge: 'border-l-accent', label: 'text-accent', defaultLabel: 'tip' },
+  note: { edge: 'border-l-line-strong', label: 'text-faint', defaultLabel: 'nota' },
+  warning: { edge: 'border-l-warn', label: 'text-warn', defaultLabel: 'aviso' },
+};
+const v = variants[type];
+---
+
+<aside class:list={['callout rounded-r-md border border-l-2 border-line bg-surface px-5 py-4', v.edge]}>
+  <p class:list={['font-mono text-[0.6875rem] font-medium tracking-[0.12em] uppercase', v.label]}>
+    {title ?? v.defaultLabel}
+  </p>
+  <div class="callout-body mt-2">
+    <slot />
+  </div>
+</aside>
+
+<style>
+  .callout-body :global(p),
+  .callout-body :global(li) {
+    color: var(--text);
+    font-size: 0.975rem;
+  }
+  .callout-body > :global(* + *) {
+    margin-top: 0.6em;
+  }
+  .callout-body :global(:not(pre) > code) {
+    font-size: 0.85em;
+  }
+</style>
