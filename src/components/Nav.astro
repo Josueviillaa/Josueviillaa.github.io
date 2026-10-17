@@ -1,6 +1,8 @@
 ---
 import ThemeToggle from './ThemeToggle.astro';
+import LangSwitch from './LangSwitch.astro';
 import { withBase } from '../lib/url';
+import { getLang, homeHref, useT } from '../i18n';
 
 interface Props {
   /** En la home los enlaces son anclas puras; desde un writeup apuntan a la home. */
@@ -9,24 +11,29 @@ interface Props {
 
 const { isHome = false } = Astro.props;
 
+const lang = getLang(Astro.url);
+const t = useT(lang);
+
 const sections = [
-  { id: 'sobre-mi', label: 'sobre mí' },
-  { id: 'skills', label: 'skills' },
-  { id: 'certificaciones', label: 'certs' },
-  { id: 'writeups', label: 'writeups' },
-  { id: 'contacto', label: 'contacto' },
+  { id: 'sobre-mi', label: t('nav.about') },
+  { id: 'skills', label: t('nav.skills') },
+  { id: 'certificaciones', label: t('nav.certs') },
+  { id: 'writeups', label: t('nav.writeups') },
+  { id: 'contacto', label: t('nav.contact') },
 ];
 
-const href = (id: string) => (isHome ? `#${id}` : withBase(`/#${id}`));
+// En la home del idioma actual, anclas puras; si no, a la home de ese idioma.
+const home = homeHref(lang);
+const href = (id: string) => (isHome ? `#${id}` : `${home}#${id}`);
 ---
 
 <header class="sticky top-0 z-50 border-b border-line bg-bg/85 backdrop-blur-md">
-  <nav class="wrap flex h-(--nav-h) items-center justify-between gap-4" aria-label="Principal">
-    <a href={isHome ? '#top' : withBase('/')} class="font-mono text-sm font-medium text-text">
+  <nav class="wrap flex h-(--nav-h) items-center justify-between gap-4" aria-label={t('nav.aria')}>
+    <a href={isHome ? '#top' : home} class="font-mono text-sm font-medium text-text">
       <span class="text-faint">~/</span>josu<span class="cursor" aria-hidden="true"></span>
     </a>
 
-    <div class="flex items-center gap-6">
+    <div class="flex items-center gap-4 sm:gap-6">
       <ul class="hidden items-center gap-6 font-mono text-[0.8125rem] md:flex">
         {
           sections.map((s, i) => (
@@ -40,16 +47,20 @@ const href = (id: string) => (isHome ? `#${id}` : withBase(`/#${id}`));
         }
       </ul>
 
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 sm:gap-3">
+        <LangSwitch />
+        <span class="hidden h-4 w-px bg-line sm:inline-block" aria-hidden="true"></span>
         <ThemeToggle />
         <button
           type="button"
           data-menu-button
           aria-expanded="false"
           aria-controls="nav-menu"
+          data-label-open={t('nav.menu')}
+          data-label-close={t('nav.close')}
           class="inline-flex h-9 items-center rounded-md border border-line px-3 font-mono text-xs text-muted transition-colors hover:text-text md:hidden"
         >
-          menú
+          {t('nav.menu')}
         </button>
       </div>
     </div>
@@ -75,11 +86,13 @@ const href = (id: string) => (isHome ? `#${id}` : withBase(`/#${id}`));
   // Menú móvil
   const button = document.querySelector<HTMLButtonElement>('[data-menu-button]');
   const menu = document.getElementById('nav-menu');
+  const labelOpen = button?.dataset.labelOpen ?? 'menu';
+  const labelClose = button?.dataset.labelClose ?? 'close';
 
   function setOpen(open: boolean) {
     if (!button || !menu) return;
     button.setAttribute('aria-expanded', String(open));
-    button.textContent = open ? 'cerrar' : 'menú';
+    button.textContent = open ? labelClose : labelOpen;
     menu.hidden = !open;
   }
 

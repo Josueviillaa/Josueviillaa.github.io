@@ -1,0 +1,20 @@
+---
+// Home en inglés (/en/). Reutiliza los mismos componentes:
+// cada uno detecta el idioma por la ruta (ver src/i18n.ts).
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Hero from '../../components/home/Hero.astro';
+import About from '../../components/home/About.astro';
+import Skills from '../../components/home/Skills.astro';
+import Certs from '../../components/home/Certs.astro';
+import Writeups from '../../components/home/Writeups.astro';
+import Contact from '../../components/home/Contact.astro';
+---
+
+<BaseLayout isHome>
+  <Hero />
+  <About />
+  <Skills />
+  <Certs />
+  <Writeups />
+  <Contact />
+</BaseLayout>

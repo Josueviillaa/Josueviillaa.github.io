@@ -1,0 +1,34 @@
+---
+/**
+ * Switch de idioma ES / EN, discreto, para el nav.
+ * El idioma activo va en acento; el otro es un enlace a su home.
+ * (Los writeups son solo español: desde cualquier página el enlace
+ *  lleva a la home del idioma correspondiente.)
+ */
+import { getLang, homeHref, useT, type Lang } from '../i18n';
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+
+const options: { code: Lang; label: string }[] = [
+  { code: 'es', label: 'ES' },
+  { code: 'en', label: 'EN' },
+];
+---
+
+<div class="flex items-center gap-1 font-mono text-xs" role="group" aria-label={t('lang.aria')}>
+  {
+    options.map((o, i) => (
+      <>
+        {i > 0 && <span class="text-line-strong" aria-hidden="true">/</span>}
+        {o.code === lang ? (
+          <span class="text-accent" aria-current="true">{o.label}</span>
+        ) : (
+          <a href={homeHref(o.code)} hreflang={o.code} class="text-faint transition-colors hover:text-text">
+            {o.label}
+          </a>
+        )}
+      </>
+    ))
+  }
+</div>

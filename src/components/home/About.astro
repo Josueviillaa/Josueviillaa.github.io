@@ -1,21 +1,26 @@
 ---
 import SectionHeader from '../SectionHeader.astro';
-import { site } from '../../config/site';
-// TODO(Josu): el texto de esta sección se edita en src/config/site.ts → about / facts
+import { content } from '../../config/site';
+import { getLang, useT } from '../../i18n';
+// Los textos se editan en src/config/site.ts → content.<idioma>.about / facts
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+const c = content[lang];
 ---
 
 <section id="sobre-mi" class="border-b border-line">
   <div class="wrap py-20 sm:py-24">
-    <SectionHeader n="01" label="whoami" title="Sobre mí" />
+    <SectionHeader n="01" label={t('about.kicker')} title={t('about.title')} />
 
     <div class="grid gap-12 md:grid-cols-[1fr_17rem]">
       <div class="max-w-2xl space-y-5 text-lg text-muted">
-        {site.about.map((p) => <p>{p}</p>)}
+        {c.about.map((p) => <p>{p}</p>)}
       </div>
 
       <dl class="h-fit border-t border-line font-mono text-[0.8125rem]">
         {
-          site.facts.map((f) => (
+          c.facts.map((f) => (
             <div class="flex flex-col gap-0.5 border-b border-line py-3">
               <dt class="text-xs text-faint">{f.label}</dt>
               <dd class="text-text">{f.value}</dd>

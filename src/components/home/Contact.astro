@@ -2,19 +2,19 @@
 import SectionHeader from '../SectionHeader.astro';
 import CopyEmail from '../CopyEmail.astro';
 import { site, githubUrl, linkedinUrl } from '../../config/site';
-// TODO(Josu): email y usuarios se editan en src/config/site.ts
+import { getLang, useT } from '../../i18n';
+// Email y usuarios se editan en src/config/site.ts
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
 ---
 
 <section id="contacto">
   <div class="wrap py-20 sm:py-24">
-    <SectionHeader n="05" label="contacto" title="Hablemos" />
+    <SectionHeader n="05" label={t('contact.kicker')} title={t('contact.title')} />
 
     <div class="grid gap-10 md:grid-cols-[1fr_1.2fr]">
-      <!-- TODO(Josu): ajusta esta frase a lo que estés buscando -->
-      <p class="max-w-md text-lg text-muted">
-        Si tienes un puesto, unas prácticas o un proyecto en el que encaje un perfil junior con método y ganas de aprender,
-        escríbeme. Respondo por email o LinkedIn.
-      </p>
+      <p class="max-w-md text-lg text-muted">{t('contact.body')}</p>
 
       <dl class="border-t border-line font-mono text-[0.8125rem]">
         <div class="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 border-b border-line py-4">

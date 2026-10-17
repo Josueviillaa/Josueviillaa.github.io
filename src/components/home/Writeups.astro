@@ -2,6 +2,10 @@
 import SectionHeader from '../SectionHeader.astro';
 import MachineCard from '../MachineCard.astro';
 import { getWriteups } from '../../lib/writeups';
+import { getLang, useT } from '../../i18n';
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
 
 // Alimentado por la content collection: añade un .mdx en src/content/writeups/
 const writeups = await getWriteups();
@@ -9,12 +13,7 @@ const writeups = await getWriteups();
 
 <section id="writeups" class="border-b border-line">
   <div class="wrap py-20 sm:py-24">
-    <SectionHeader
-      n="04"
-      label="writeups"
-      title="Máquinas resueltas"
-      intro="Writeups de máquinas retiradas de HackTheBox: enumeración, vector de entrada, escalada y lo que aprendí en cada fase."
-    />
+    <SectionHeader n="04" label={t('writeups.kicker')} title={t('writeups.title')} intro={t('writeups.intro')} />
 
     {
       writeups.length ? (
@@ -26,7 +25,7 @@ const writeups = await getWriteups();
           ))}
         </ul>
       ) : (
-        <p class="font-mono text-sm text-faint">Aún no hay writeups publicados.</p>
+        <p class="font-mono text-sm text-faint">{t('writeups.empty')}</p>
       )
     }
   </div>

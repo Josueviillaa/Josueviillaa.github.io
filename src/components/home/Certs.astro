@@ -2,12 +2,16 @@
 import SectionHeader from '../SectionHeader.astro';
 import CertCard from '../CertCard.astro';
 import { certs } from '../../data/certs';
-// TODO(Josu): añade certificaciones en src/data/certs.ts
+import { getLang, useT } from '../../i18n';
+// Añade certificaciones en src/data/certs.ts
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
 ---
 
 <section id="certificaciones" class="border-b border-line">
   <div class="wrap py-20 sm:py-24">
-    <SectionHeader n="03" label="certs" title="Certificaciones" />
+    <SectionHeader n="03" label={t('certs.kicker')} title={t('certs.title')} />
 
     <div class="grid gap-5 md:grid-cols-2">
       {certs.map((cert) => <CertCard cert={cert} />)}

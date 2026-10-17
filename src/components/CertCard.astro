@@ -1,19 +1,24 @@
 ---
 import type { Cert, CertStatus } from '../data/certs';
 import Icon from './Icon.astro';
+import { getLang, useT } from '../i18n';
 
 interface Props {
   cert: Cert;
 }
 
 const { cert } = Astro.props;
+const lang = getLang(Astro.url);
+const t = useT(lang);
 
-const status: Record<CertStatus, { label: string; cls: string; edge: string }> = {
-  obtenida: { label: 'obtenida', cls: 'border-accent/40 bg-accent-soft text-accent', edge: 'border-l-accent' },
-  'en-curso': { label: 'en curso', cls: 'border-warn/40 bg-warn-soft text-warn', edge: 'border-l-warn' },
-  planificada: { label: 'planificada', cls: 'border-line-strong text-muted', edge: 'border-l-line-strong' },
+// Colores por estado; la etiqueta visible se traduce.
+const styles: Record<CertStatus, { cls: string; edge: string }> = {
+  obtenida: { cls: 'border-accent/40 bg-accent-soft text-accent', edge: 'border-l-accent' },
+  'en-curso': { cls: 'border-warn/40 bg-warn-soft text-warn', edge: 'border-l-warn' },
+  planificada: { cls: 'border-line-strong text-muted', edge: 'border-l-line-strong' },
 };
-const s = status[cert.status];
+const s = styles[cert.status];
+const statusLabel = t(`cert.status.${cert.status}` as 'cert.status.obtenida');
 ---
 
 <article class:list={['rounded-r-lg border border-l-2 border-line bg-surface p-6 sm:p-7', s.edge]}>
@@ -29,7 +34,7 @@ const s = status[cert.status];
         s.cls,
       ]}
     >
-      {s.label}
+      {statusLabel}
     </span>
   </div>
 
@@ -37,12 +42,16 @@ const s = status[cert.status];
     cert.flags && (
       <div class="mt-6">
         <div class="flex items-baseline justify-between font-mono text-xs">
-          <span class="text-faint">flags capturadas</span>
+          <span class="text-faint">{t('cert.flags')}</span>
           <span class="text-text">
             {cert.flags.captured}/{cert.flags.total}
           </span>
         </div>
-        <div class="mt-2 flex gap-1" role="img" aria-label={`${cert.flags.captured} de ${cert.flags.total} flags`}>
+        <div
+          class="mt-2 flex gap-1"
+          role="img"
+          aria-label={`${cert.flags.captured} ${t('cert.of')} ${cert.flags.total} ${t('cert.flags_word')}`}
+        >
           {Array.from({ length: cert.flags.total }, (_, i) => (
             <span class:list={['h-1.5 flex-1 rounded-[1px]', i < cert.flags!.captured ? 'bg-accent' : 'bg-line-strong']} />
           ))}
@@ -63,7 +72,7 @@ const s = status[cert.status];
         rel="noopener noreferrer"
         class="link mt-5 inline-flex items-center gap-1.5 font-mono text-xs"
       >
-        verificar credencial <Icon name="arrow-right" size={14} />
+        {t('cert.verify')} <Icon name="arrow-right" size={14} />
       </a>
     )
   }

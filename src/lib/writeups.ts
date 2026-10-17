@@ -1,4 +1,5 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
+import type { Lang } from '../i18n';
 
 export type Writeup = CollectionEntry<'writeups'>;
 export type Difficulty = Writeup['data']['difficulty'];
@@ -9,6 +10,13 @@ export async function getWriteups(): Promise<Writeup[]> {
   return entries.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
 }
 
-export function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('es-ES', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date);
+const dateLocale: Record<Lang, string> = { es: 'es-ES', en: 'en-GB' };
+
+export function formatDate(date: Date, lang: Lang = 'es'): string {
+  return new Intl.DateTimeFormat(dateLocale[lang], {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
 }

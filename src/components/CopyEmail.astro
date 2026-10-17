@@ -3,16 +3,25 @@
  * Email como texto seleccionable + botón de copiar.
  * Sin mailto: muchos reclutadores no tienen cliente de correo configurado.
  */
+import { getLang, useT } from '../i18n';
+
 interface Props {
   email: string;
   class?: string;
 }
 
 const { email, class: className } = Astro.props;
+const lang = getLang(Astro.url);
+const t = useT(lang);
 ---
 
 <div
   data-copy-email
+  data-label={t('copy.label')}
+  data-done={t('copy.done')}
+  data-fallback={t('copy.fallback')}
+  data-status-ok={t('copy.status_ok')}
+  data-status-fallback={t('copy.status_fallback')}
   class:list={[
     'inline-flex max-w-full items-stretch overflow-hidden rounded-md border border-line bg-surface font-mono text-[0.8125rem]',
     className,
@@ -23,9 +32,9 @@ const { email, class: className } = Astro.props;
     type="button"
     data-copy-button
     class="shrink-0 border-l border-line px-3 text-muted transition-colors hover:bg-raised hover:text-accent"
-    aria-label={`Copiar ${email} al portapapeles`}
+    aria-label={`${t('copy.aria_prefix')} ${email} ${t('copy.aria_suffix')}`}
   >
-    <span data-copy-label>copiar</span>
+    <span data-copy-label>{t('copy.label')}</span>
   </button>
   <span data-copy-status class="sr-only" aria-live="polite"></span>
 </div>
@@ -36,6 +45,13 @@ const { email, class: className } = Astro.props;
     const button = root.querySelector<HTMLButtonElement>('[data-copy-button]')!;
     const label = root.querySelector<HTMLElement>('[data-copy-label]')!;
     const status = root.querySelector<HTMLElement>('[data-copy-status]')!;
+    const msg = {
+      label: root.dataset.label ?? 'copy',
+      done: root.dataset.done ?? 'copied',
+      fallback: root.dataset.fallback ?? 'ctrl+c',
+      ok: root.dataset.statusOk ?? '',
+      selected: root.dataset.statusFallback ?? '',
+    };
     let timer: number | undefined;
 
     function selectText() {
@@ -46,13 +62,13 @@ const { email, class: className } = Astro.props;
       sel?.addRange(range);
     }
 
-    function flash(msg: string, ok: boolean) {
-      label.textContent = msg;
-      status.textContent = ok ? 'Email copiado al portapapeles' : 'Email seleccionado, pulsa Ctrl+C para copiarlo';
+    function flash(text: string, ok: boolean) {
+      label.textContent = text;
+      status.textContent = ok ? msg.ok : msg.selected;
       button.classList.toggle('text-accent', ok);
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
-        label.textContent = 'copiar';
+        label.textContent = msg.label;
         button.classList.remove('text-accent');
       }, 1800);
     }
@@ -61,11 +77,11 @@ const { email, class: className } = Astro.props;
       const value = text.textContent?.trim() ?? '';
       try {
         await navigator.clipboard.writeText(value);
-        flash('copiado', true);
+        flash(msg.done, true);
       } catch {
         // Sin API de portapapeles (http, permisos…): dejamos el texto seleccionado.
         selectText();
-        flash('ctrl+c', false);
+        flash(msg.fallback, false);
       }
     });
   });

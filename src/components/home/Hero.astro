@@ -1,19 +1,25 @@
 ---
 import Icon from '../Icon.astro';
 import CopyEmail from '../CopyEmail.astro';
-import { site, githubUrl, linkedinUrl } from '../../config/site';
+import { site, content, githubUrl, linkedinUrl } from '../../config/site';
 import { certs } from '../../data/certs';
 import { getWriteups } from '../../lib/writeups';
+import { getLang, useT } from '../../i18n';
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+const c = content[lang];
 
 const writeups = await getWriteups();
-const earned = certs.filter((c) => c.status === 'obtenida').map((c) => c.code);
+const earned = certs.filter((cert) => cert.status === 'obtenida').map((cert) => cert.code);
+const machineWord = writeups.length === 1 ? t('unit.machine_one') : t('unit.machine_many');
 
 // Ficha del panel "terminal": todo sale de config/datos, nada inventado aquí.
 const profile = [
-  ['rol', 'pentester junior'],
-  ['formación', 'máster en ciberseguridad & ia · evolve'],
-  ['certs', earned.length ? earned.join(', ') : '—'],
-  ['writeups', `${writeups.length} ${writeups.length === 1 ? 'máquina' : 'máquinas'} · HTB`],
+  [t('hero.role_label'), c.profile.role],
+  [t('hero.education_label'), c.profile.education],
+  [t('hero.certs_label'), earned.length ? earned.join(', ') : '—'],
+  [t('hero.writeups_label'), `${writeups.length} ${machineWord} · HTB`],
 ];
 ---
 
@@ -29,15 +35,15 @@ const profile = [
     <div class="min-w-0">
       <p class="flex items-center gap-2.5 font-mono text-xs text-muted">
         <span class="status-dot" aria-hidden="true"></span>
-        <span data-rotate="status" class="transition-opacity duration-500">{site.statuses[0]}</span>
+        <span data-rotate="status" class="transition-opacity duration-500">{c.statuses[0]}</span>
       </p>
 
       <h1 class="mt-6 text-6xl font-bold sm:text-7xl">{site.name}</h1>
 
-      <p class="mt-4 font-display text-lg font-medium text-text sm:text-xl">{site.role}</p>
+      <p class="mt-4 font-display text-lg font-medium text-text sm:text-xl">{c.role}</p>
 
       <p class="mt-5 max-w-xl text-lg text-muted">
-        <span data-rotate="pitch" class="transition-opacity duration-500">{site.pitches[0]}</span>
+        <span data-rotate="pitch" class="transition-opacity duration-500">{c.pitches[0]}</span>
       </p>
 
       <div class="mt-9 flex flex-wrap items-center gap-3">
@@ -61,13 +67,13 @@ const profile = [
       </div>
     </div>
 
-    <div class="min-w-0 overflow-hidden rounded-lg border border-line bg-surface" aria-label="Resumen de perfil">
+    <div class="min-w-0 overflow-hidden rounded-lg border border-line bg-surface" aria-label={t('hero.aria')}>
       <div class="flex items-center justify-between border-b border-line bg-raised px-4 py-2 font-mono text-xs text-faint">
         <span>josu@kali: ~</span>
         <span>zsh</span>
       </div>
       <div class="space-y-1 p-5 font-mono text-[0.8125rem] leading-7">
-        <p><span class="text-accent">$</span> <span class="text-text">cat perfil.txt</span></p>
+        <p><span class="text-accent">$</span> <span class="text-text">{t('hero.cmd')}</span></p>
         <dl class="grid grid-cols-[6.5rem_1fr] gap-x-3 pb-1">
           {
             profile.map(([k, v]) => (
@@ -84,7 +90,7 @@ const profile = [
   </div>
 </section>
 
-<script define:vars={{ pitches: site.pitches, statuses: site.statuses }}>
+<script define:vars={{ pitches: c.pitches, statuses: c.statuses }}>
   // Rota el texto de los elementos [data-rotate] con un fade suave.
   // Se desactiva si el usuario prefiere menos movimiento (accesibilidad).
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
