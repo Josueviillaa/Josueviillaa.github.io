@@ -10,9 +10,9 @@ import { getLang, switchHref, useT, type Lang } from '../i18n';
 const lang = getLang(Astro.url);
 const t = useT(lang);
 
-const options: { code: Lang; label: string }[] = [
-  { code: 'es', label: 'ES' },
-  { code: 'en', label: 'EN' },
+const options: { code: Lang; label: string; name: string }[] = [
+  { code: 'es', label: 'ES', name: 'Español' },
+  { code: 'en', label: 'EN', name: 'English' },
 ];
 ---
 
@@ -22,10 +22,19 @@ const options: { code: Lang; label: string }[] = [
       <>
         {i > 0 && <span class="text-line-strong" aria-hidden="true">/</span>}
         {o.code === lang ? (
-          <span class="text-accent" aria-current="true">{o.label}</span>
+          <span class="text-accent" aria-current="true">
+            <span aria-hidden="true">{o.label}</span>
+            <span class="sr-only">{o.name}</span>
+          </span>
         ) : (
-          <a href={switchHref(Astro.url, o.code)} hreflang={o.code} class="text-faint transition-colors hover:text-text">
-            {o.label}
+          <a
+            href={switchHref(Astro.url, o.code)}
+            hreflang={o.code}
+            lang={o.code}
+            aria-label={o.name}
+            class="text-faint transition-colors hover:text-text"
+          >
+            <span aria-hidden="true">{o.label}</span>
           </a>
         )}
       </>

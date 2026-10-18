@@ -48,9 +48,8 @@ export const content: Record<Lang, LocaleContent> = {
     description:
       'Josu — pentester junior y máster en Ciberseguridad & IA. CV, certificaciones y writeups de máquinas de HackTheBox.',
     about: [
-      'Soy Josue y la ciberseguridad me engancha desde pequeño. Siempre me ha dado por romper cosas para después arreglarlas —trastear con consolas, móviles y todo lo que cayera en mis manos—. Esa curiosidad por entender cómo funciona algo por dentro, y cómo se rompe, es la que me trajo al pentesting.',
-      'Acabo de terminar el Máster en Ciberseguridad & IA en Evolve con buena nota. De cara al futuro me quiero especializar en purple team, con el foco puesto en el lado ofensivo del red team.',
-      'Busco un equipo —preferiblemente en remoto— para hacer prácticas o trabajar. Soy una persona abierta y proactiva, me manejo bien en equipo, valoro rodearme de buena gente y tengo muchas ganas de seguir formándome.',
+      'Pentester junior con Máster en Ciberseguridad & IA, especializado en seguridad ofensiva: aplicaciones web y Active Directory. Documento cada máquina que resuelvo —enumeración, vector de entrada, escalada y la lección de cada fase.',
+      'Busco incorporarme a un equipo de seguridad ofensiva, preferiblemente en remoto. Metódico, autodidacta y acostumbrado a trabajar en equipo.',
     ],
     facts: [
       { label: 'Rol', value: 'Pentester junior' },
@@ -69,9 +68,8 @@ export const content: Record<Lang, LocaleContent> = {
     description:
       'Josu — junior pentester with an MSc in Cybersecurity & AI. CV, certifications and HackTheBox machine write-ups.',
     about: [
-      "I'm Josue and cybersecurity has hooked me since I was a kid. I was always taking things apart to put them back together —tinkering with consoles, phones and anything within reach—. That curiosity for how something works inside, and how it breaks, is what led me to pentesting.",
-      "I've just finished the MSc in Cybersecurity & AI at Evolve with a good grade. Going forward I want to specialize in purple team, with the focus on the offensive, red-team side.",
-      "I'm looking for a team —ideally remote— for an internship or a job. I'm open and proactive, I work well in a team, I value good people around me and I'm eager to keep learning.",
+      'Junior pentester with an MSc in Cybersecurity & AI, focused on offensive security: web applications and Active Directory. I document every machine I solve —enumeration, entry vector, privilege escalation and the lesson from each phase.',
+      'Looking to join an offensive-security team, ideally remote. Methodical, self-taught and used to working as part of a team.',
     ],
     facts: [
       { label: 'Role', value: 'Junior pentester' },

@@ -1,7 +1,7 @@
 ---
 import '../styles/global.css';
 import Nav from '../components/Nav.astro';
-import { site, content } from '../config/site';
+import { site, content, githubUrl, linkedinUrl } from '../config/site';
 import { withBase } from '../lib/url';
 import { getLang, useT, localeTag, ogLocale } from '../i18n';
 
@@ -23,6 +23,33 @@ const year = new Date().getFullYear();
 // hreflang para la home (las dos versiones de idioma)
 const esHome = new URL(withBase('/'), Astro.site);
 const enHome = new URL(withBase('/en/'), Astro.site);
+
+// Datos estructurados (schema.org Person) — ayuda a buscadores a entender quién es Josu.
+const personLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: site.name,
+  jobTitle: c.role,
+  description: c.description,
+  url: esHome.href,
+  email: `mailto:${site.email}`,
+  sameAs: [githubUrl, linkedinUrl],
+  knowsLanguage: ['Spanish', 'English'],
+  knowsAbout: [
+    'Penetration testing',
+    'Offensive security',
+    'Active Directory',
+    'Web application security',
+    'Privilege escalation',
+    'OWASP Top 10',
+    'HackTheBox',
+  ],
+  hasCredential: {
+    '@type': 'EducationalOccupationalCredential',
+    credentialCategory: 'certification',
+    name: 'eJPT — eLearnSecurity Junior Penetration Tester',
+  },
+};
 ---
 
 <!doctype html>
@@ -32,7 +59,10 @@ const enHome = new URL(withBase('/en/'), Astro.site);
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
+    <meta name="author" content={site.name} />
+    <meta name="robots" content="index, follow" />
     <link rel="canonical" href={canonical} />
+    <link rel="sitemap" href={withBase('/sitemap-index.xml')} />
     {
       isHome && (
         <>
@@ -52,6 +82,12 @@ const enHome = new URL(withBase('/en/'), Astro.site);
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:locale" content={ogLocale[lang]} />
+    <meta property="og:site_name" content={site.name} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+
+    {isHome && <script type="application/ld+json" set:html={JSON.stringify(personLd)} />}
 
     <!-- Aplica el tema guardado ANTES de pintar, para evitar parpadeo -->
     <script is:inline>

