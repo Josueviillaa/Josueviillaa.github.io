@@ -27,6 +27,27 @@ export function homeHref(lang: Lang): string {
   return lang === 'en' ? withBase('/en/') : withBase('/');
 }
 
+/** Ruta "lógica" (sin base ni prefijo de idioma): '' = home, 'writeups/' = listado… */
+function logicalPath(url: URL): string {
+  const base = import.meta.env.BASE_URL || '/';
+  let p = url.pathname.startsWith(base) ? url.pathname.slice(base.length) : url.pathname;
+  p = p.replace(/^\//, '');
+  if (p === 'en' || p.startsWith('en/')) p = p.slice(2).replace(/^\//, '');
+  return p;
+}
+
+/**
+ * Enlace equivalente en el otro idioma. Mantiene al usuario en la misma
+ * página cuando existe en ambos (home, listado de writeups); desde el detalle
+ * de un writeup (solo español) lleva al listado del otro idioma.
+ */
+export function switchHref(url: URL, target: Lang): string {
+  let logical = logicalPath(url);
+  if (/^writeups\/.+/.test(logical)) logical = 'writeups/';
+  const prefix = target === 'en' ? 'en/' : '';
+  return withBase(`/${prefix}${logical}`);
+}
+
 export const localeTag: Record<Lang, string> = { es: 'es', en: 'en' };
 export const ogLocale: Record<Lang, string> = { es: 'es_ES', en: 'en_US' };
 
@@ -69,6 +90,10 @@ const ui = {
     'writeups.intro':
       'Writeups de máquinas retiradas de HackTheBox: enumeración, vector de entrada, escalada y lo que aprendí en cada fase.',
     'writeups.empty': 'Aún no hay writeups publicados.',
+    'writeups.all': 'Ver todos los writeups',
+    'writeups.back': 'inicio',
+    'writeups.count_one': 'máquina',
+    'writeups.count_many': 'máquinas',
 
     'contact.kicker': 'contacto',
     'contact.title': 'Hablemos',
@@ -133,6 +158,10 @@ const ui = {
     'writeups.intro':
       'Write-ups of retired HackTheBox machines: enumeration, entry vector, privilege escalation and lessons from each phase. The full write-ups are in Spanish.',
     'writeups.empty': 'No write-ups published yet.',
+    'writeups.all': 'View all write-ups',
+    'writeups.back': 'home',
+    'writeups.count_one': 'machine',
+    'writeups.count_many': 'machines',
 
     'contact.kicker': 'contact',
     'contact.title': "Let's talk",

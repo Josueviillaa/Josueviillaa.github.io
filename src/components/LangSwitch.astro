@@ -5,7 +5,7 @@
  * (Los writeups son solo español: desde cualquier página el enlace
  *  lleva a la home del idioma correspondiente.)
  */
-import { getLang, homeHref, useT, type Lang } from '../i18n';
+import { getLang, switchHref, useT, type Lang } from '../i18n';
 
 const lang = getLang(Astro.url);
 const t = useT(lang);
@@ -24,7 +24,7 @@ const options: { code: Lang; label: string }[] = [
         {o.code === lang ? (
           <span class="text-accent" aria-current="true">{o.label}</span>
         ) : (
-          <a href={homeHref(o.code)} hreflang={o.code} class="text-faint transition-colors hover:text-text">
+          <a href={switchHref(Astro.url, o.code)} hreflang={o.code} class="text-faint transition-colors hover:text-text">
             {o.label}
           </a>
         )}

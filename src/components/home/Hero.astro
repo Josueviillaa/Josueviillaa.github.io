@@ -35,16 +35,14 @@ const profile = [
     <div class="min-w-0">
       <p class="flex items-center gap-2.5 font-mono text-xs text-muted">
         <span class="status-dot" aria-hidden="true"></span>
-        <span data-rotate="status" class="transition-opacity duration-500">{c.statuses[0]}</span>
+        <span>{c.status}</span>
       </p>
 
       <h1 class="mt-6 text-6xl font-bold sm:text-7xl">{site.name}</h1>
 
       <p class="mt-4 font-display text-lg font-medium text-text sm:text-xl">{c.role}</p>
 
-      <p class="mt-5 max-w-xl text-lg text-muted">
-        <span data-rotate="pitch" class="transition-opacity duration-500">{c.pitches[0]}</span>
-      </p>
+      <p class="mt-5 max-w-xl text-lg text-muted">{c.pitch}</p>
 
       <div class="mt-9 flex flex-wrap items-center gap-3">
         <a
@@ -89,26 +87,3 @@ const profile = [
     </div>
   </div>
 </section>
-
-<script define:vars={{ pitches: c.pitches, statuses: c.statuses }}>
-  // Rota el texto de los elementos [data-rotate] con un fade suave.
-  // Se desactiva si el usuario prefiere menos movimiento (accesibilidad).
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-
-  const sources = { pitch: pitches, status: statuses };
-
-  document.querySelectorAll('[data-rotate]').forEach((el) => {
-    const list = sources[el.dataset.rotate];
-    if (reduce.matches || !Array.isArray(list) || list.length < 2) return;
-
-    let i = 0;
-    setInterval(() => {
-      el.style.opacity = '0';
-      setTimeout(() => {
-        i = (i + 1) % list.length;
-        el.textContent = list[i];
-        el.style.opacity = '1';
-      }, 500); // coincide con la duración del fade
-    }, 4800);
-  });
-</script>

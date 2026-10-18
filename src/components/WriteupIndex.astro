@@ -1,0 +1,47 @@
+---
+import MachineCard from './MachineCard.astro';
+import Icon from './Icon.astro';
+import { getWriteups } from '../lib/writeups';
+import { getLang, homeHref, useT } from '../i18n';
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+
+const writeups = await getWriteups();
+const countWord = writeups.length === 1 ? t('writeups.count_one') : t('writeups.count_many');
+---
+
+<section class="wrap pt-10 pb-20 sm:pt-12 sm:pb-24">
+  <a
+    href={homeHref(lang)}
+    class="inline-flex items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-accent"
+  >
+    <Icon name="arrow-left" size={14} /> {t('writeups.back')}
+  </a>
+
+  <header class="mt-8 flex flex-col gap-3 border-b border-line pb-10">
+    <p class="flex items-center gap-3 font-mono text-xs text-faint">
+      <span class="font-medium text-accent">//</span>
+      <span class="h-px w-8 bg-line-strong" aria-hidden="true"></span>
+      <span>{t('writeups.kicker')}</span>
+      <span class="text-line-strong">·</span>
+      <span>{writeups.length} {countWord}</span>
+    </p>
+    <h1 class="text-4xl font-bold sm:text-5xl">{t('writeups.title')}</h1>
+    <p class="max-w-2xl text-muted">{t('writeups.intro')}</p>
+  </header>
+
+  {
+    writeups.length ? (
+      <ul class="mt-10 grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
+        {writeups.map((entry) => (
+          <li>
+            <MachineCard entry={entry} />
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="mt-10 font-mono text-sm text-faint">{t('writeups.empty')}</p>
+    )
+  }
+</section>

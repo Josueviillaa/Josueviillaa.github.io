@@ -26,10 +26,10 @@ interface Fact {
 
 interface LocaleContent {
   role: string;
-  /** Frases del hero: rotan solas (deja una sola si no quieres rotación). */
-  pitches: string[];
-  /** Texto junto al dot animado del hero: también rota. */
-  statuses: string[];
+  /** Frase del hero. */
+  pitch: string;
+  /** Texto junto al dot del hero (estado, sobrio). */
+  status: string;
   description: string;
   /** SOBRE MÍ — 2-3 párrafos. Cada string es un párrafo. */
   about: string[];
@@ -42,12 +42,9 @@ interface LocaleContent {
 export const content: Record<Lang, LocaleContent> = {
   es: {
     role: 'Pentester junior · Máster en Ciberseguridad & IA',
-    pitches: [
+    pitch:
       'Aprendo atacando sistemas en entornos controlados y documento cada paso: qué enumeré, qué funcionó y por qué.',
-      'Del purple al red team: entender cómo se rompe algo es el primer paso para saber protegerlo.',
-      'Llevo rompiendo cosas para arreglarlas desde pequeño. Ahora, con método y por escrito.',
-    ],
-    statuses: ['buscando prácticas', 'buscando trabajo', 'abierto a oportunidades'],
+    status: 'Abierto a nuevas oportunidades',
     description:
       'Josu — pentester junior y máster en Ciberseguridad & IA. CV, certificaciones y writeups de máquinas de HackTheBox.',
     about: [
@@ -66,12 +63,9 @@ export const content: Record<Lang, LocaleContent> = {
 
   en: {
     role: 'Junior pentester · MSc in Cybersecurity & AI',
-    pitches: [
+    pitch:
       'I learn by attacking systems in controlled environments and documenting every step: what I enumerated, what worked and why.',
-      'From purple to red team: understanding how something breaks is the first step to protecting it.',
-      "I've been breaking things to fix them since I was a kid. Now, with method and in writing.",
-    ],
-    statuses: ['seeking an internship', 'seeking a job', 'open to opportunities'],
+    status: 'Open to new opportunities',
     description:
       'Josu — junior pentester with an MSc in Cybersecurity & AI. CV, certifications and HackTheBox machine write-ups.',
     about: [

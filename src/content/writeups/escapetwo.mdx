@@ -4,6 +4,7 @@ platform: "HackTheBox"
 os: "Windows"
 difficulty: "Easy"
 date: 2026-10-18
+ports: ["389/ldap", "445/smb", "636/ldaps", "1433/mssql", "3268/ldap-gc", "5985/winrm"]
 tags: ["active-directory", "mssql", "adcs", "esc4", "password-reuse", "acl-abuse", "assumed-breach"]
 summary: "DC de Active Directory en modo assumed-breach. De unas credenciales iniciales a Domain Admin encadenando fuga de credenciales en un share SMB, abuso de MSSQL con xp_cmdshell, reutilización de contraseñas vía password spraying, abuso de ACL (WriteOwner) y explotación de una plantilla de certificado vulnerable en ADCS (ESC4)."
 ---

@@ -1,14 +1,19 @@
 ---
 import SectionHeader from '../SectionHeader.astro';
 import MachineCard from '../MachineCard.astro';
+import Icon from '../Icon.astro';
 import { getWriteups } from '../../lib/writeups';
 import { getLang, useT } from '../../i18n';
+import { withBase } from '../../lib/url';
 
 const lang = getLang(Astro.url);
 const t = useT(lang);
 
-// Alimentado por la content collection: añade un .mdx en src/content/writeups/
+// En la home mostramos solo las más recientes; el resto, en /writeups/.
+const LIMIT = 3;
 const writeups = await getWriteups();
+const shown = writeups.slice(0, LIMIT);
+const indexHref = withBase(lang === 'en' ? '/en/writeups/' : '/writeups/');
 ---
 
 <section id="writeups" class="border-b border-line">
@@ -16,14 +21,25 @@ const writeups = await getWriteups();
     <SectionHeader n="04" label={t('writeups.kicker')} title={t('writeups.title')} intro={t('writeups.intro')} />
 
     {
-      writeups.length ? (
-        <ul class="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
-          {writeups.map((entry) => (
-            <li>
-              <MachineCard entry={entry} />
-            </li>
-          ))}
-        </ul>
+      shown.length ? (
+        <>
+          <ul class="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
+            {shown.map((entry) => (
+              <li>
+                <MachineCard entry={entry} />
+              </li>
+            ))}
+          </ul>
+
+          <a
+            href={indexHref}
+            class="group mt-8 inline-flex items-center gap-2 font-mono text-[0.8125rem] text-muted transition-colors hover:text-accent"
+          >
+            {t('writeups.all')}
+            <span class="text-faint">({writeups.length})</span>
+            <Icon name="arrow-right" size={14} class="transition-transform group-hover:translate-x-0.5" />
+          </a>
+        </>
       ) : (
         <p class="font-mono text-sm text-faint">{t('writeups.empty')}</p>
       )
