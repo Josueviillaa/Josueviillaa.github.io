@@ -97,6 +97,17 @@ const personLd = {
       } catch {}
     </script>
 
+    {
+      /* Primera visita a la home en español: si el navegador no está en español,
+         redirige a /en/. La elección del switch se guarda y manda sobre esto. */
+      isHome && lang === 'es' && (
+        <script
+          is:inline
+          set:html={`try{if(!localStorage.getItem('lang')){var n=(navigator.language||'').toLowerCase();if(n&&n.indexOf('es')!==0){localStorage.setItem('lang','en');location.replace(${JSON.stringify(enHome.pathname)});}else{localStorage.setItem('lang','es');}}}catch(e){}`}
+        />
+      )
+    }
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

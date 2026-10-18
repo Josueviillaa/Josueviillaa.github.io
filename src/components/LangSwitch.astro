@@ -32,6 +32,7 @@ const options: { code: Lang; label: string; name: string }[] = [
             hreflang={o.code}
             lang={o.code}
             aria-label={o.name}
+            data-lang-choice={o.code}
             class="text-faint transition-colors hover:text-text"
           >
             <span aria-hidden="true">{o.label}</span>
@@ -41,3 +42,14 @@ const options: { code: Lang; label: string; name: string }[] = [
     ))
   }
 </div>
+
+<script>
+  // Recuerda la elección de idioma para que mande sobre la autodetección.
+  document.querySelectorAll<HTMLAnchorElement>('[data-lang-choice]').forEach((a) => {
+    a.addEventListener('click', () => {
+      try {
+        localStorage.setItem('lang', a.dataset.langChoice!);
+      } catch {}
+    });
+  });
+</script>
