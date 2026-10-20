@@ -19,7 +19,8 @@ const profile = [
   [t('hero.role_label'), c.profile.role],
   [t('hero.education_label'), c.profile.education],
   [t('hero.certs_label'), earned.length ? earned.join(', ') : '—'],
-  [t('hero.writeups_label'), `${writeups.length} ${machineWord} · HTB`],
+  [t('hero.htb_label'), `${site.htb.rank} · ${site.htb.machines} ${t('unit.machine_many')}`],
+  [t('hero.writeups_label'), `${writeups.length} ${machineWord}`],
 ];
 ---
 

@@ -17,8 +17,13 @@ export const site = {
     github: 'Josueviillaa',
     linkedin: 'josuevillaa',
   },
-  // Perfil de HackTheBox (URL completa).
-  htb: 'https://app.hackthebox.com/users/2811454',
+  // Perfil de HackTheBox. Actualiza rank/machines cuando cambien
+  // (HTB no da API pública, así que se mantienen a mano).
+  htb: {
+    url: 'https://app.hackthebox.com/users/2811454',
+    rank: 'Professional', // TODO(Josu): tu rango actual de HTB
+    machines: 60, // TODO(Josu): máquinas comprometidas
+  },
 } as const;
 
 interface Fact {
@@ -87,4 +92,4 @@ export const content: Record<Lang, LocaleContent> = {
 
 export const githubUrl = `https://github.com/${site.links.github}`;
 export const linkedinUrl = `https://www.linkedin.com/in/${site.links.linkedin}`;
-export const htbUrl = site.htb;
+export const htbUrl = site.htb.url;

@@ -1,7 +1,7 @@
 ---
 import '../styles/global.css';
 import Nav from '../components/Nav.astro';
-import { site, content, githubUrl, linkedinUrl } from '../config/site';
+import { site, content, githubUrl, linkedinUrl, htbUrl } from '../config/site';
 import { withBase } from '../lib/url';
 import { getLang, useT, localeTag, ogLocale } from '../i18n';
 
@@ -33,7 +33,7 @@ const personLd = {
   description: c.description,
   url: esHome.href,
   email: `mailto:${site.email}`,
-  sameAs: [githubUrl, linkedinUrl, site.htb],
+  sameAs: [githubUrl, linkedinUrl, htbUrl],
   knowsLanguage: ['Spanish', 'English'],
   knowsAbout: [
     'Penetration testing',

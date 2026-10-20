@@ -72,6 +72,7 @@ const ui = {
     'hero.education_label': 'formación',
     'hero.certs_label': 'certs',
     'hero.writeups_label': 'writeups',
+    'hero.htb_label': 'htb',
     'unit.machine_one': 'máquina',
     'unit.machine_many': 'máquinas',
 
@@ -140,6 +141,7 @@ const ui = {
     'hero.education_label': 'education',
     'hero.certs_label': 'certs',
     'hero.writeups_label': 'writeups',
+    'hero.htb_label': 'htb',
     'unit.machine_one': 'machine',
     'unit.machine_many': 'machines',
 
