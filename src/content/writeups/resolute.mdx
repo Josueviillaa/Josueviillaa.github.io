@@ -13,6 +13,16 @@ summary: "DC de Windows Server 2016 donde una contraseña filtrada en un campo d
 
 Resolute es un Domain Controller de `megabank.local` donde el acceso no depende de un solo exploit, sino de una **cadena de descuidos**: una contraseña olvidada en un campo de LDAP, unas credenciales en texto plano en un log de PowerShell, y por último el abuso de una pertenencia a `DnsAdmins` para ejecutar código como SYSTEM. Es un recorrido de Active Directory de manual.
 
+<AttackChain
+  label="Cadena de ataque · de LDAP anónimo a Domain Admin"
+  steps={[
+    { title: 'LDAP anónimo', desc: 'El bind anónimo deja leer una contraseña por defecto en un campo description.', action: 'password spraying contra todos los usuarios' },
+    { title: 'Usuario inicial · WinRM', desc: 'El spray acierta en otra cuenta (Remote Management Users) → shell remota.', action: 'PSTranscripts: net use con credenciales en claro' },
+    { title: 'Segundo usuario · DnsAdmins', desc: 'Un log de PowerShell Transcription filtra credenciales nuevas de un usuario de DnsAdmins.', action: 'ServerLevelPluginDll + reinicio del servicio DNS' },
+    { title: 'SYSTEM → Domain Admins', desc: 'El servicio DNS (SYSTEM) carga una DLL a medida que añade el usuario a Domain Admins.', tone: 'win' },
+  ]}
+/>
+
 ## Reconocimiento
 
 El escaneo de puertos canta "Domain Controller" a la primera: DNS (53), Kerberos (88), LDAP (389/636/3268), SMB (445), WinRM (5985) y ADWS (9389). El `-sCV` confirma el terreno:
