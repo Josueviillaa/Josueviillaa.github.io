@@ -4,6 +4,7 @@ import WriteupLayout from '../../layouts/WriteupLayout.astro';
 import Terminal from '../../components/writeup/Terminal.astro';
 import Lesson from '../../components/writeup/Lesson.astro';
 import Callout from '../../components/Callout.astro';
+import AttackChain from '../../components/writeup/AttackChain.astro';
 import { getWriteups, type Writeup } from '../../lib/writeups';
 
 export async function getStaticPaths() {
@@ -21,5 +22,5 @@ const { Content, headings } = await render(entry);
 
 <WriteupLayout entry={entry} headings={headings}>
   <!-- Componentes disponibles en cualquier .mdx sin importarlos -->
-  <Content components={{ Terminal, Lesson, Callout }} />
+  <Content components={{ Terminal, Lesson, Callout, AttackChain }} />
 </WriteupLayout>

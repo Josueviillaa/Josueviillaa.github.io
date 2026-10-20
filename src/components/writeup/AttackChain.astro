@@ -1,0 +1,221 @@
+---
+/**
+ * Diagrama genérico de una cadena de ataque.
+ * Flujo vertical y accesible (lista ordenada): cada nodo es un estado/privilegio
+ * y la línea que lo une lleva la acción que desbloquea el siguiente.
+ * Usa los tokens de color del sitio → funciona en tema claro y oscuro.
+ *
+ * Uso en un .mdx (disponible sin import, como <Callout>):
+ *
+ *   <AttackChain
+ *     tag="ESC7"
+ *     label="de ManageCa a Domain Admin"
+ *     steps={[
+ *       { title: 'Raven · ManageCa', desc: '…', action: 'certipy ca -add-officer raven' },
+ *       { title: 'Petición PENDING', desc: '…', tone: 'pending', action: '…' },
+ *       { title: 'Domain Admin', desc: '…', tone: 'win' },
+ *     ]}
+ *   />
+ *
+ * tone (opcional): 'start' | 'step' | 'pending' | 'win'.
+ * Por defecto el primer nodo es 'start', el último 'win' y el resto 'step'.
+ */
+export type ChainTone = 'start' | 'step' | 'pending' | 'win';
+
+export interface ChainStep {
+  title: string;
+  desc?: string;
+  /** Acción que lleva al siguiente nodo (se muestra en el conector) */
+  action?: string;
+  /** Marcador del nodo; por defecto su número (o ✓ en el nodo final) */
+  marker?: string;
+  tone?: ChainTone;
+}
+
+interface Props {
+  steps: ChainStep[];
+  /** Etiqueta corta destacada (p. ej. una técnica: "ESC7") */
+  tag?: string;
+  /** Texto de la leyenda */
+  label?: string;
+}
+
+const { steps, tag, label } = Astro.props;
+const last = steps.length - 1;
+
+function toneOf(step: ChainStep, i: number): ChainTone {
+  return step.tone ?? (i === 0 ? 'start' : i === last ? 'win' : 'step');
+}
+function markerOf(step: ChainStep, i: number, tone: ChainTone): string {
+  return step.marker ?? (tone === 'win' ? '✓' : String(i + 1));
+}
+---
+
+<figure class="chain" role="group" aria-label={label ? `Cadena de ataque: ${label}` : 'Cadena de ataque'}>
+  {
+    (tag || label) && (
+      <figcaption class="chain-cap">
+        {tag && <span class="chain-tag">{tag}</span>}
+        {label && <span>{label}</span>}
+      </figcaption>
+    )
+  }
+
+  <ol class="chain-flow">
+    {
+      steps.map((step, i) => {
+        const tone = toneOf(step, i);
+        return (
+          <li class:list={['chain-node', `t-${tone}`, i < last && 'has-next']}>
+            <span class="chain-marker" aria-hidden="true">
+              {markerOf(step, i, tone)}
+            </span>
+            <div class="chain-body">
+              <p class="chain-title">{step.title}</p>
+              {step.desc && <p class="chain-desc">{step.desc}</p>}
+              {step.action && (
+                <p class="chain-action">
+                  <span class="chain-arrow" aria-hidden="true">
+                    ↳
+                  </span>
+                  <code>{step.action}</code>
+                </p>
+              )}
+            </div>
+          </li>
+        );
+      })
+    }
+  </ol>
+</figure>
+
+<style>
+  .chain {
+    margin: 2rem 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 1.25rem 1.25rem 0.75rem;
+  }
+  .chain-cap {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+  .chain-cap code {
+    font-size: 0.85em;
+    color: var(--text);
+  }
+  .chain-tag {
+    padding: 0.1rem 0.45rem;
+    border: 1px solid color-mix(in srgb, var(--crit) 45%, transparent);
+    border-radius: 4px;
+    background: var(--crit-soft);
+    color: var(--crit);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+
+  .chain-flow {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .chain-node {
+    position: relative;
+    padding-left: 2.75rem;
+    padding-bottom: 1.5rem;
+  }
+  .chain-node.has-next::before {
+    content: '';
+    position: absolute;
+    left: 0.84rem;
+    top: 1.9rem;
+    bottom: -0.1rem;
+    width: 2px;
+    background: var(--line-strong);
+  }
+  .chain-marker {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+    border: 1.5px solid var(--line-strong);
+    background: var(--bg);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .chain-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.0625rem;
+    line-height: 1.3;
+    color: var(--text);
+  }
+  .chain-desc {
+    margin-top: 0.2rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .chain-action {
+    margin-top: 0.55rem;
+    display: flex;
+    gap: 0.4rem;
+    align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-faint);
+    overflow-wrap: anywhere;
+  }
+  .chain-action .chain-arrow {
+    color: var(--accent);
+  }
+  .chain-action code {
+    color: var(--text-muted);
+  }
+
+  /* Tonos */
+  .t-start .chain-marker,
+  .t-step .chain-marker {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .t-pending .chain-marker {
+    border-color: var(--warn);
+    color: var(--warn);
+  }
+  .t-pending .chain-title {
+    color: var(--warn);
+  }
+  .t-win .chain-marker {
+    border-color: var(--crit);
+    background: var(--crit);
+    color: var(--bg);
+  }
+  .t-win .chain-title {
+    color: var(--crit);
+  }
+  .t-win {
+    padding-bottom: 0.25rem;
+  }
+
+  @media (max-width: 420px) {
+    .chain {
+      padding-inline: 1rem;
+    }
+    .chain-node {
+      padding-left: 2.4rem;
+    }
+  }
+</style>

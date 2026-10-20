@@ -1,7 +1,7 @@
 ---
 import SectionHeader from '../SectionHeader.astro';
 import CopyEmail from '../CopyEmail.astro';
-import { site, githubUrl, linkedinUrl } from '../../config/site';
+import { site, githubUrl, linkedinUrl, htbUrl } from '../../config/site';
 import { getLang, useT } from '../../i18n';
 // Email y usuarios se editan en src/config/site.ts
 
@@ -34,6 +34,14 @@ const t = useT(lang);
           <dd class="min-w-0 break-all">
             <a href={linkedinUrl} target="_blank" rel="noopener noreferrer" class="link">
               linkedin.com/in/{site.links.linkedin}
+            </a>
+          </dd>
+        </div>
+        <div class="grid grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 border-b border-line py-4">
+          <dt class="text-faint">htb</dt>
+          <dd class="min-w-0 break-all">
+            <a href={htbUrl} target="_blank" rel="noopener noreferrer" class="link">
+              app.hackthebox.com/users/2811454
             </a>
           </dd>
         </div>

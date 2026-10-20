@@ -160,44 +160,17 @@ uid=0(root) …
 
 ## La cadena de ataque de un vistazo
 
-```text
-  ┌──────────────────────────────────────────────────────────────┐
-  │  RECON                                                         │
-  │  nmap TCP + UDP → 161/udp SNMP abierto en una caja Nagios      │
-  └────────────────────────────┬─────────────────────────────────┘
-                               ▼
-  ┌──────────────────────────────────────────────────────────────┐
-  │  INFORMATION DISCLOSURE                                        │
-  │  SNMP community "public" → snmpwalk de procesos                │
-  │  → credenciales de svc en los argumentos de check_host.sh      │
-  └────────────────────────────┬─────────────────────────────────┘
-                               ▼
-  ┌──────────────────────────────────────────────────────────────┐
-  │  AUTH BYPASS                                                   │
-  │  svc deshabilitado en web/SSH, pero /api/v1/authenticate       │
-  │  entrega token → canje de token por sesión de navegador        │
-  └────────────────────────────┬─────────────────────────────────┘
-                               ▼
-  ┌──────────────────────────────────────────────────────────────┐
-  │  SQL INJECTION  (CVE-2023-40931)                               │
-  │  SQLi autenticada en el banner "acknowledge" (parámetro id)    │
-  │  → volcado de xi_users → API key del administrador             │
-  └────────────────────────────┬─────────────────────────────────┘
-                               ▼
-  ┌──────────────────────────────────────────────────────────────┐
-  │  RCE  (CVE-2023-47400)                                         │
-  │  API key admin → crear usuario admin propio → Custom Includes  │
-  │  file-upload bypass (JFIF + .jpg.php + borrar .htaccess)       │
-  │  → webshell (ejecución de comandos)                            │
-  └────────────────────────────┬─────────────────────────────────┘
-                               ▼
-  ┌──────────────────────────────────────────────────────────────┐
-  │  PRIVESC → ROOT                                                │
-  │  /usr/local/nagios/bin/nagios escribible por el grupo nagios   │
-  │  + sudo manage_services.sh restart nagios (como root)          │
-  │  → root ejecuta el binario reemplazado → SUID bash → root      │
-  └──────────────────────────────────────────────────────────────┘
-```
+<AttackChain
+  label="Cadena de ataque · de un puerto UDP a root"
+  steps={[
+    { title: 'Recon', desc: 'nmap TCP + UDP → 161/udp SNMP abierto en una caja Nagios.', action: 'snmpwalk (community "public")' },
+    { title: 'Information disclosure', desc: 'Credenciales de servicio en los argumentos de un proceso (check_host.sh).', action: 'POST /api/v1/authenticate' },
+    { title: 'Auth bypass', desc: 'La API entrega token pese a la cuenta deshabilitada en web → sesión de navegador.', action: 'SQLi en el banner "acknowledge"' },
+    { title: 'SQL injection · CVE-2023-40931', desc: 'Volcado de xi_users → API key del administrador.', action: 'crear admin + Custom Includes' },
+    { title: 'RCE · CVE-2023-47400', desc: 'File-upload bypass (JFIF + .jpg.php + borrar .htaccess) → webshell.', action: 'binario de servicio escribible + sudo' },
+    { title: 'Root', desc: 'nagios (escribible por el grupo) reiniciado por sudo → SUID bash → root.', tone: 'win' },
+  ]}
+/>
 
 ## Reflexión final
 

@@ -9,8 +9,6 @@ tags: ["active-directory", "adcs", "esc7", "mssql", "certipy", "rid-brute", "pas
 summary: "DC de Active Directory comprometido de punta a punta: enumeración anónima vía RID cycling, password spraying para un foothold en MSSQL, un backup de la web olvidado con credenciales LDAP, y escalada a Domain Admin abusando de permisos sobre la CA de ADCS (ESC7)."
 ---
 
-import Esc7Chain from "../../components/writeup/Esc7Chain.astro";
-
 ## Resumen
 
 Manager es una máquina Windows que modela un Domain Controller con una PKI de Active Directory mal configurada. La cadena completa fue:
@@ -133,7 +131,19 @@ No te fíes solo del flag `-vulnerable` de Certipy. ESC7 depende de ACLs sobre l
 
 Raven tiene `ManageCa` pero no `ManageCertificates`. Cada paso habilita el siguiente, hasta convertir un permiso sobre la CA en el hash del Administrator:
 
-<Esc7Chain />
+<AttackChain
+  tag="ESC7"
+  label="de ManageCa a Domain Admin"
+  steps={[
+    { title: 'Raven · ManageCa', desc: 'Permiso administrativo sobre la Autoridad Certificadora.', action: 'certipy ca -add-officer raven' },
+    { title: '+ ManageCertificates', desc: 'Como ManageCa puede nombrar officers, Raven se auto-concede el permiso para emitir.', action: 'certipy ca -enable-template SubCA' },
+    { title: 'Plantilla SubCA habilitada', desc: 'La plantilla permite especificar un SAN arbitrario (suplantar a cualquiera).', action: 'certipy req -upn administrator@manager.htb' },
+    { title: 'Petición #ID · PENDING', desc: 'Sale TEMPLATE_DENIED y queda pendiente. Se anota el Request ID.', tone: 'pending', action: 'certipy ca -issue-request <ID>   (ya es officer)' },
+    { title: 'Certificado emitido', desc: 'Se aprueba la petición y se recoge administrator.pfx con -retrieve.', action: 'certipy auth -pfx   ·   PKINIT + UnPAC-the-hash' },
+    { title: 'Hash NT de Administrator', desc: 'El certificado es la identidad del admin: PKINIT devuelve su TGT y su hash.', action: 'pass-the-hash   ·   evil-winrm -H' },
+    { title: 'Domain Admin', desc: 'Shell como Administrator. Compromiso total del dominio.', tone: 'win' },
+  ]}
+/>
 
 Los comandos de la cadena, en orden:
 

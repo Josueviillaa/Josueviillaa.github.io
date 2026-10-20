@@ -1,7 +1,7 @@
 ---
 import Icon from '../Icon.astro';
 import CopyEmail from '../CopyEmail.astro';
-import { site, content, githubUrl, linkedinUrl } from '../../config/site';
+import { site, content, githubUrl, linkedinUrl, htbUrl } from '../../config/site';
 import { certs } from '../../data/certs';
 import { getWriteups } from '../../lib/writeups';
 import { getLang, useT } from '../../i18n';
@@ -60,6 +60,14 @@ const profile = [
           class="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-surface px-3.5 font-mono text-[0.8125rem] text-text transition-colors hover:border-accent hover:text-accent"
         >
           <Icon name="linkedin" /> LinkedIn
+        </a>
+        <a
+          href={htbUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-surface px-3.5 font-mono text-[0.8125rem] text-text transition-colors hover:border-accent hover:text-accent"
+        >
+          <Icon name="htb" /> HackTheBox
         </a>
         <CopyEmail email={site.email} />
       </div>

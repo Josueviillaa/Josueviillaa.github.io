@@ -13,17 +13,17 @@ Un DC de Windows Server 2008 R2 (dominio `cascade.local`) donde el nombre no es 
 
 ## Resumen de la cadena
 
-```text
-LDAP anónimo (cascadeLegacyPwd base64)
-   └─> r.thompson
-         └─> SMB share "Data" (VNC Install.reg)
-               └─> pass VNC (DES clave fija)  ──> s.smith
-                     └─> SMB share "Audit$" (CascAudit.exe + Audit.db)
-                           └─> AES clave fija en .NET  ──> arksvc
-                                 └─> grupo "AD Recycle Bin"
-                                       └─> objeto borrado TempAdmin (cascadeLegacyPwd base64)
-                                             └─> reutilización de pass ──> Administrator
-```
+<AttackChain
+  label="Cadena de ataque · de LDAP anónimo a Administrator"
+  steps={[
+    { title: 'LDAP anónimo', desc: 'Atributo custom cascadeLegacyPwd (base64) → credenciales de r.thompson.', action: 'SMB share "Data"' },
+    { title: 'r.thompson', desc: 'El share "Data" guarda un VNC Install.reg.', action: 'VNC: DES con clave fija' },
+    { title: 's.smith', desc: 'Contraseña de VNC descifrada → acceso por WinRM.', action: 'SMB share "Audit$"' },
+    { title: 'arksvc', desc: 'AES con clave fija en un binario .NET (CascAudit) → contraseña en Audit.db.', action: 'grupo "AD Recycle Bin"' },
+    { title: 'AD Recycle Bin', desc: 'Objeto borrado TempAdmin con cascadeLegacyPwd (base64).', action: 'reutilización de contraseña' },
+    { title: 'Administrator', desc: 'La contraseña de TempAdmin vale para el Administrator real.', tone: 'win' },
+  ]}
+/>
 
 ## Reconocimiento
 
