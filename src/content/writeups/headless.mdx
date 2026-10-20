@@ -19,6 +19,16 @@ Máquina Linux de dificultad *easy* centrada en seguridad web. La cadena complet
 3. **Command injection** en el formulario del dashboard de administrador → RCE.
 4. **Privesc a root** vía un binario `sudo` que ejecuta un script por ruta relativa.
 
+<AttackChain
+  label="Cadena de ataque · de un XSS a root"
+  steps={[
+    { title: 'XSS en User-Agent', desc: 'El panel interno del admin renderiza la cabecera User-Agent sin sanitizar.', action: 'robo de la cookie (sin HttpOnly)' },
+    { title: 'Dashboard de admin', desc: 'La cookie robada da acceso al panel de administración.', action: 'command injection en el health report' },
+    { title: 'RCE · usuario dvir', desc: 'Inyección de comandos en el formulario → reverse shell.', action: 'sudo syscheck (ruta relativa)' },
+    { title: 'Root', desc: 'Un script sudo invoca initdb.sh por ruta relativa desde un directorio escribible → SUID bash.', tone: 'win' },
+  ]}
+/>
+
 ---
 
 ## Reconocimiento

@@ -15,6 +15,16 @@ Alert es una máquina Linux de dificultad *easy* cuyo foothold destaca por combi
 
 La escalada a root abusa de un servicio PHP de monitorización que escucha solo en `127.0.0.1:8080`, corre como `root` e incluye un fichero de configuración escribible por un grupo al que pertenece el usuario comprometido.
 
+<AttackChain
+  label="Cadena de ataque · de un XSS a root"
+  steps={[
+    { title: 'XSS + LFI vía el bot', desc: 'XSS almacenado en el visor de Markdown; el bot admin ejecuta un LFI interno en messages.php.', action: 'exfiltrar el .htpasswd del vhost statistics' },
+    { title: 'albert · SSH', desc: 'El hash apr1 del .htpasswd se crackea y se reutiliza en SSH.', action: 'servicio PHP root en 127.0.0.1:8080' },
+    { title: 'config escribible', desc: 'albert pertenece a management y puede escribir el configuration.php que el servicio root incluye.', action: 'inyectar PHP → RCE como root' },
+    { title: 'Root', desc: 'El servicio root crea una copia SUID de bash → /bin/bash -p.', tone: 'win' },
+  ]}
+/>
+
 <Callout type="note">
 Lección transversal: una vulnerabilidad "de bajo impacto" (un XSS self-only con cookie `HttpOnly`) se vuelve crítica cuando existe un actor con más privilegios que visita tu contenido. El contexto de ejecución importa tanto como la vulnerabilidad.
 </Callout>

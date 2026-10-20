@@ -34,6 +34,16 @@ Searcher no se gana con un exploit espectacular, sino **encadenando descuidos
 pequeños** hasta llegar al control total del sistema. No fue magia: fue método.
 Esa es, para mí, la lección más valiosa de la máquina.
 
+<AttackChain
+  label="Cadena de ataque · de la versión de una librería a root"
+  steps={[
+    { title: 'Recon · Searchor 2.4.0', desc: 'El footer revela la librería y su versión, con un eval() inseguro.', action: 'inyección en el parámetro de búsqueda' },
+    { title: 'Foothold · RCE', desc: 'La entrada del usuario llega a eval() → ejecución como el usuario del servicio web.', action: 'secreto en .git/config' },
+    { title: 'Usuario', desc: 'Credenciales incrustadas en el repositorio Git, reutilizadas por un usuario del sistema.', action: 'sudo -l: script con ruta relativa' },
+    { title: 'Root', desc: 'PATH hijacking de un binario invocado sin ruta absoluta en un script sudo.', tone: 'win' },
+  ]}
+/>
+
 ## Reconocimiento — Leer lo que el servidor te regala
 
 Nmap mostraba solo dos puertos abiertos. El servidor web corría Apache, pero por

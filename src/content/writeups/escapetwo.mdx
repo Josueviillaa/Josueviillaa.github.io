@@ -22,6 +22,18 @@ La cadena de ataque completa:
 5. **Abuso de ACL**: `ryan` tiene `WriteOwner` sobre `ca_svc` → toma de control de la cuenta.
 6. **ADCS / ESC4**: `ca_svc` (miembro de *Cert Publishers*) puede reconfigurar una plantilla de certificado vulnerable → certificado de `Administrator` → hash NT → shell como Domain Admin.
 
+<AttackChain
+  tag="ESC4"
+  label="de un Excel a Domain Admin"
+  steps={[
+    { title: 'SMB · Accounting Department', desc: 'Un Excel en un share no estándar filtra la contraseña de sa (MSSQL).', action: 'login sa → xp_cmdshell' },
+    { title: 'MSSQL · RCE', desc: 'Comandos como sql_svc; el fichero de instalación guarda su contraseña en claro.', action: 'password spraying' },
+    { title: 'ryan', desc: 'sql_svc reutiliza la contraseña con el usuario ryan.', action: 'ACL: WriteOwner sobre ca_svc' },
+    { title: 'ca_svc', desc: 'WriteOwner → FullControl → Shadow Credentials → hash de ca_svc.', action: 'ADCS: plantilla vulnerable (ESC4)' },
+    { title: 'ESC4 → Domain Admin', desc: 'ca_svc reconfigura la plantilla → certificado de Administrator → hash NT.', tone: 'win' },
+  ]}
+/>
+
 <Callout type="note">
 El hilo conductor de la box es la **reutilización de credenciales** entre cuentas de servicio y cuentas de persona. Cada vez que consigues una contraseña nueva, el reflejo debe ser probarla contra toda la lista de usuarios del dominio.
 </Callout>
