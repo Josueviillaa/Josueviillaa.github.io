@@ -1,0 +1,231 @@
+---
+/**
+ * Diagrama de la cadena de ataque ADCS ESC7 (máquina Manager).
+ * Flujo vertical y accesible (lista ordenada): cada nodo es un estado/privilegio
+ * y la línea que lo une lleva la acción de Certipy que desbloquea el siguiente.
+ * Usa los tokens de color del sitio, así que funciona en tema claro y oscuro.
+ */
+type Tone = 'start' | 'step' | 'pending' | 'win';
+
+interface Node {
+  marker: string;
+  title: string;
+  desc: string;
+  tone: Tone;
+  /** Acción que lleva al siguiente nodo (se muestra en el conector) */
+  action?: string;
+}
+
+const nodes: Node[] = [
+  {
+    marker: '1',
+    title: 'Raven · ManageCa',
+    desc: 'Permiso administrativo sobre la Autoridad Certificadora.',
+    tone: 'start',
+    action: 'certipy ca -add-officer raven',
+  },
+  {
+    marker: '2',
+    title: '+ ManageCertificates',
+    desc: 'Como ManageCa puede nombrar officers, Raven se auto-concede el permiso para emitir.',
+    tone: 'step',
+    action: 'certipy ca -enable-template SubCA',
+  },
+  {
+    marker: '3',
+    title: 'Plantilla SubCA habilitada',
+    desc: 'La plantilla permite especificar un SAN arbitrario (suplantar a cualquiera).',
+    tone: 'step',
+    action: 'certipy req -upn administrator@manager.htb',
+  },
+  {
+    marker: '4',
+    title: 'Petición #ID · PENDING',
+    desc: 'Sale TEMPLATE_DENIED y queda pendiente. Se anota el Request ID.',
+    tone: 'pending',
+    action: 'certipy ca -issue-request <ID>   (ya es officer)',
+  },
+  {
+    marker: '5',
+    title: 'Certificado emitido',
+    desc: 'Se aprueba la petición y se recoge administrator.pfx con -retrieve.',
+    tone: 'step',
+    action: 'certipy auth -pfx   ·   PKINIT + UnPAC-the-hash',
+  },
+  {
+    marker: '6',
+    title: 'Hash NT de Administrator',
+    desc: 'El certificado es la identidad del admin: PKINIT devuelve su TGT y su hash.',
+    tone: 'step',
+    action: 'pass-the-hash   ·   evil-winrm -H',
+  },
+  {
+    marker: '✓',
+    title: 'Domain Admin',
+    desc: 'Shell como Administrator. Compromiso total del dominio.',
+    tone: 'win',
+  },
+];
+---
+
+<figure class="esc7" role="group" aria-label="Diagrama de la cadena de ataque ESC7">
+  <figcaption class="esc7-cap">
+    <span class="esc7-cap-tag">ESC7</span>
+    <span>de <code>ManageCa</code> a Domain Admin</span>
+  </figcaption>
+
+  <ol class="esc7-flow">
+    {
+      nodes.map((n, i) => (
+        <li class:list={['esc7-node', `t-${n.tone}`, i < nodes.length - 1 && 'has-next']}>
+          <span class="esc7-marker" aria-hidden="true">{n.marker}</span>
+          <div class="esc7-body">
+            <p class="esc7-title">{n.title}</p>
+            <p class="esc7-desc">{n.desc}</p>
+            {n.action && (
+              <p class="esc7-action">
+                <span class="esc7-arrow" aria-hidden="true">↳</span>
+                <code>{n.action}</code>
+              </p>
+            )}
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+</figure>
+
+<style>
+  .esc7 {
+    margin: 2rem 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 1.25rem 1.25rem 0.75rem;
+  }
+  .esc7-cap {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+  .esc7-cap code {
+    font-size: 0.85em;
+    color: var(--text);
+  }
+  .esc7-cap-tag {
+    padding: 0.1rem 0.45rem;
+    border: 1px solid color-mix(in srgb, var(--crit) 45%, transparent);
+    border-radius: 4px;
+    background: var(--crit-soft);
+    color: var(--crit);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+
+  .esc7-flow {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .esc7-node {
+    position: relative;
+    padding-left: 2.75rem;
+    padding-bottom: 1.5rem;
+  }
+  /* Espina que conecta los nodos */
+  .esc7-node.has-next::before {
+    content: '';
+    position: absolute;
+    left: 0.84rem;
+    top: 1.9rem;
+    bottom: -0.1rem;
+    width: 2px;
+    background: var(--line-strong);
+  }
+
+  .esc7-marker {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+    border: 1.5px solid var(--line-strong);
+    background: var(--bg);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .esc7-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.0625rem;
+    line-height: 1.3;
+    color: var(--text);
+  }
+  .esc7-desc {
+    margin-top: 0.2rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+  .esc7-action {
+    margin-top: 0.55rem;
+    display: flex;
+    gap: 0.4rem;
+    align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-faint);
+    overflow-wrap: anywhere;
+  }
+  .esc7-action .esc7-arrow {
+    color: var(--accent);
+  }
+  .esc7-action code {
+    color: var(--text-muted);
+  }
+
+  /* Tonos por nodo */
+  .t-start .esc7-marker,
+  .t-step .esc7-marker {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .t-pending .esc7-marker {
+    border-color: var(--warn);
+    color: var(--warn);
+  }
+  .t-pending .esc7-title {
+    color: var(--warn);
+  }
+  .t-win .esc7-marker {
+    border-color: var(--crit);
+    background: var(--crit);
+    color: var(--bg);
+  }
+  .t-win .esc7-title {
+    color: var(--crit);
+  }
+  .t-win {
+    padding-bottom: 0.25rem;
+  }
+
+  @media (max-width: 420px) {
+    .esc7 {
+      padding-inline: 1rem;
+    }
+    .esc7-node {
+      padding-left: 2.4rem;
+    }
+  }
+</style>
