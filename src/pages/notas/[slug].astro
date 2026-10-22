@@ -1,0 +1,25 @@
+---
+import { render } from 'astro:content';
+import NoteLayout from '../../layouts/NoteLayout.astro';
+import Terminal from '../../components/writeup/Terminal.astro';
+import Lesson from '../../components/writeup/Lesson.astro';
+import Callout from '../../components/Callout.astro';
+import AttackChain from '../../components/writeup/AttackChain.astro';
+import { getNotes, type Note } from '../../lib/notes';
+
+export async function getStaticPaths() {
+  const entries = await getNotes();
+  return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+interface Props {
+  entry: Note;
+}
+
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+---
+
+<NoteLayout entry={entry} headings={headings}>
+  <Content components={{ Terminal, Lesson, Callout, AttackChain }} />
+</NoteLayout>

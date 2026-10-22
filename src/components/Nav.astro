@@ -1,6 +1,7 @@
 ---
 import ThemeToggle from './ThemeToggle.astro';
 import LangSwitch from './LangSwitch.astro';
+import { withBase } from '../lib/url';
 import { getLang, homeHref, useT } from '../i18n';
 
 interface Props {
@@ -24,6 +25,10 @@ const sections = [
 // En la home del idioma actual, anclas puras; si no, a la home de ese idioma.
 const home = homeHref(lang);
 const href = (id: string) => (isHome ? `#${id}` : `${home}#${id}`);
+
+// "notas" es una página aparte (no un ancla de la home).
+const notasHref = withBase(lang === 'en' ? '/en/notas/' : '/notas/');
+const notasNum = String(sections.length + 1).padStart(2, '0');
 ---
 
 <header class="sticky top-0 z-50 border-b border-line bg-bg/85 backdrop-blur-md">
@@ -44,6 +49,12 @@ const href = (id: string) => (isHome ? `#${id}` : `${home}#${id}`);
             </li>
           ))
         }
+        <li>
+          <a href={notasHref} class="text-muted transition-colors hover:text-text">
+            <span class="text-faint">{notasNum}.</span>
+            {t('nav.notes')}
+          </a>
+        </li>
       </ul>
 
       <div class="flex items-center gap-2 sm:gap-3">
@@ -77,6 +88,12 @@ const href = (id: string) => (isHome ? `#${id}` : `${home}#${id}`);
           </li>
         ))
       }
+      <li>
+        <a href={notasHref} class="flex gap-3 py-2.5 text-muted hover:text-text">
+          <span class="text-faint">{notasNum}.</span>
+          {t('nav.notes')}
+        </a>
+      </li>
     </ul>
   </div>
 </header>

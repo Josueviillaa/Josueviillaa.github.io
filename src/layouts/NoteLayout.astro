@@ -1,0 +1,118 @@
+---
+import type { MarkdownHeading } from 'astro';
+import BaseLayout from './BaseLayout.astro';
+import Icon from '../components/Icon.astro';
+import { formatDate } from '../lib/writeups';
+import { withBase } from '../lib/url';
+import { getLang, useT } from '../i18n';
+import type { Note } from '../lib/notes';
+
+interface Props {
+  entry: Note;
+  headings: MarkdownHeading[];
+}
+
+const { entry, headings } = Astro.props;
+const { title, topic, date, tags, summary } = entry.data;
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+
+// Cada "## " es una sección de la nota
+const sections = headings.filter((h) => h.depth === 2);
+---
+
+<BaseLayout title={title} description={summary}>
+  <article class="wrap pt-10 pb-20 sm:pt-12">
+    <a
+      href={withBase('/notas/')}
+      class="inline-flex items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-accent"
+    >
+      <Icon name="arrow-left" size={14} /> {t('notes.kicker')}
+    </a>
+
+    <header class="mt-8 border-b border-line pb-10">
+      <p class="font-mono text-xs text-faint">
+        <span class="text-accent">#</span> {topic}
+        <span class="text-line-strong">·</span>
+        <time datetime={date.toISOString()}>{formatDate(date, lang)}</time>
+      </p>
+      <h1 class="mt-3 text-4xl font-bold sm:text-5xl">{title}</h1>
+      <p class="mt-4 max-w-2xl text-lg text-muted">{summary}</p>
+
+      {
+        tags.length > 0 && (
+          <ul class="mt-6 flex flex-wrap gap-1.5" aria-label={t('card.techniques')}>
+            {tags.map((tg) => (
+              <li class="rounded-sm bg-raised px-2 py-0.5 font-mono text-[0.6875rem] text-muted">{tg}</li>
+            ))}
+          </ul>
+        )
+      }
+    </header>
+
+    <div class="mt-12 grid gap-12 lg:grid-cols-[13rem_minmax(0,1fr)]">
+      {
+        sections.length > 0 && (
+          <nav aria-label={t('notes.sections')} class="hidden lg:block">
+            <div class="sticky top-[calc(var(--nav-h)+2rem)]">
+              <p class="font-mono text-xs text-faint">{t('notes.sections')}</p>
+              <ol class="mt-3 space-y-0.5 border-l border-line font-mono text-[0.8125rem]">
+                {sections.map((h, i) => (
+                  <li>
+                    <a
+                      href={`#${h.slug}`}
+                      data-phase-link={h.slug}
+                      class="-ml-px flex gap-2.5 border-l border-transparent py-1 pl-3 text-muted transition-colors hover:text-text"
+                    >
+                      <span class="text-faint tabular-nums transition-colors">{String(i + 1).padStart(2, '0')}</span>
+                      <span>{h.text}</span>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </nav>
+          <script>
+            const links = document.querySelectorAll<HTMLAnchorElement>('[data-phase-link]');
+            const heads = [...links]
+              .map((l) => document.getElementById(l.dataset.phaseLink!))
+              .filter((el): el is HTMLElement => el !== null);
+            function setActive(id: string) {
+              links.forEach((l) => {
+                const on = l.dataset.phaseLink === id;
+                l.classList.toggle('border-accent', on);
+                l.classList.toggle('text-text', on);
+                l.classList.toggle('text-muted', !on);
+                l.querySelector('span')?.classList.toggle('text-accent', on);
+                l.querySelector('span')?.classList.toggle('text-faint', !on);
+                if (on) l.setAttribute('aria-current', 'true');
+                else l.removeAttribute('aria-current');
+              });
+            }
+            if (heads.length) {
+              const observer = new IntersectionObserver(
+                (entries) => {
+                  const visible = entries.filter((e) => e.isIntersecting);
+                  if (visible.length) setActive(visible[0].target.id);
+                },
+                { rootMargin: '-20% 0px -70% 0px' },
+              );
+              heads.forEach((h) => observer.observe(h));
+            }
+          </script>
+        )
+      }
+
+      <div class="writeup min-w-0 max-w-3xl">
+        <slot />
+      </div>
+    </div>
+
+    <footer class="mt-16 border-t border-line pt-6">
+      <p class="max-w-3xl font-mono text-xs leading-relaxed text-faint">
+        {t('notes.footer')}
+      </p>
+    </footer>
+  </article>
+</BaseLayout>

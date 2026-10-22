@@ -43,7 +43,7 @@ function logicalPath(url: URL): string {
  */
 export function switchHref(url: URL, target: Lang): string {
   let logical = logicalPath(url);
-  if (/^writeups\/.+/.test(logical)) logical = 'writeups/';
+  logical = logical.replace(/^(writeups|notas)\/.+$/, '$1/');
   const prefix = target === 'en' ? 'en/' : '';
   return withBase(`/${prefix}${logical}`);
 }
@@ -95,6 +95,17 @@ const ui = {
     'writeups.back': 'inicio',
     'writeups.count_one': 'máquina',
     'writeups.count_many': 'máquinas',
+
+    'nav.notes': 'notas',
+    'notes.kicker': 'notas',
+    'notes.title': 'Notas y técnicas',
+    'notes.intro':
+      'Apuntes sobre vectores y técnicas de seguridad ofensiva, explicados de forma genérica — el concepto, no una máquina concreta.',
+    'notes.empty': 'Aún no hay notas publicadas.',
+    'notes.sections': 'secciones',
+    'notes.footer':
+      'Nota técnica con fines educativos. Se describe el concepto del vector de forma genérica, para aplicarlo solo en entornos autorizados.',
+    'note.read': 'leer',
 
     'contact.kicker': 'contacto',
     'contact.title': 'Hablemos',
@@ -164,6 +175,17 @@ const ui = {
     'writeups.back': 'home',
     'writeups.count_one': 'machine',
     'writeups.count_many': 'machines',
+
+    'nav.notes': 'notes',
+    'notes.kicker': 'notes',
+    'notes.title': 'Notes & techniques',
+    'notes.intro':
+      'Notes on offensive-security vectors and techniques, explained generically — the concept, not a specific machine.',
+    'notes.empty': 'No notes published yet.',
+    'notes.sections': 'sections',
+    'notes.footer':
+      'Technical note for educational purposes. The vector is described generically, to be applied only in authorized environments.',
+    'note.read': 'read',
 
     'contact.kicker': 'contact',
     'contact.title': "Let's talk",

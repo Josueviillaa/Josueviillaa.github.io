@@ -33,4 +33,21 @@ const writeups = defineCollection({
   }),
 });
 
-export const collections = { writeups };
+/**
+ * Notas / técnicas. Artículos sobre un concepto o vector (no una máquina
+ * concreta). Un archivo .md/.mdx por nota en src/content/notes/.
+ */
+const notes = defineCollection({
+  loader: glob({ pattern: '**/[^_]*.{md,mdx}', base: './src/content/notes' }),
+  schema: z.object({
+    title: z.string(),
+    /** Área de la nota, p. ej. "Active Directory" */
+    topic: z.string().default('Active Directory'),
+    date: z.coerce.date(),
+    tags: z.array(z.string()).default([]),
+    summary: z.string(),
+    draft: z.boolean().default(false),
+  }),
+});
+
+export const collections = { writeups, notes };
