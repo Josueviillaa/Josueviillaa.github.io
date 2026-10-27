@@ -6,10 +6,11 @@
  *
  * Variantes:
  *   tip     → acento (cian)      · consejo / truco
+ *   info    → acento (cian)      · nota informativa
  *   note    → neutro             · aclaración
  *   warning → warn (ámbar)       · aviso importante
  */
-type CalloutType = 'tip' | 'note' | 'warning';
+type CalloutType = 'tip' | 'info' | 'note' | 'warning';
 
 interface Props {
   type?: CalloutType;
@@ -21,10 +22,11 @@ const { type = 'note', title } = Astro.props;
 
 const variants: Record<CalloutType, { edge: string; label: string; defaultLabel: string }> = {
   tip: { edge: 'border-l-accent', label: 'text-accent', defaultLabel: 'tip' },
+  info: { edge: 'border-l-accent', label: 'text-accent', defaultLabel: 'info' },
   note: { edge: 'border-l-line-strong', label: 'text-faint', defaultLabel: 'nota' },
   warning: { edge: 'border-l-warn', label: 'text-warn', defaultLabel: 'aviso' },
 };
-const v = variants[type];
+const v = variants[type] ?? variants.note;
 ---
 
 <aside class:list={['callout rounded-r-md border border-l-2 border-line bg-surface px-5 py-4', v.edge]}>

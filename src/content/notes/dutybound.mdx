@@ -1,0 +1,73 @@
+---
+title: "Dutybound"
+topic: "Máquina activa · spoiler-free"
+date: 2026-10-26
+tags: ["linux", "web", "injection", "database", "privilege-escalation"]
+summary: "Notas conceptuales (sin spoilers) de Dutybound: un kiosko de tienda duty-free. Writeup completo cuando la máquina retire."
+---
+
+<Callout type="warning">
+  Máquina **activa**. Estas notas son **spoiler-free** a propósito: no incluyen
+  flags, payloads, comandos ni rutas concretas. El writeup detallado se publicará
+  cuando la caja retire.
+</Callout>
+
+## De qué va
+
+Dutybound monta el escaparate de una **tienda duty-free de aeropuerto**: un
+carrito de la compra y un flujo de checkout que, antes de pagar, "escanea" una
+tarjeta de embarque para decidir tu situación fiscal. Casi toda la superficie
+interesante gira en torno a **cómo el backend interpreta esa tarjeta de embarque**
+y qué hace después con lo que extrae de ella.
+
+## El recorrido, en conceptos
+
+Sin entrar en el cómo, el camino tocó cuatro ideas que me parecieron muy
+didácticas:
+
+- **Reversear un formato propietario a ciegas.** El servidor espera un formato
+  de datos estructurado y estricto. No hay documentación del parser: lo reconstruí
+  **usando sus propios mensajes de error como brújula**, satisfaciendo campo a campo
+  hasta mapear toda la estructura.
+- **Confianza mal puesta en datos del cliente.** Una decisión "de negocio" que el
+  servidor trataba como fiable resultaba derivar de datos que el cliente controla
+  al 100%. Clásico de *broken access control* cuando lo piensas, pero bien
+  escondido tras capas de parsing.
+- **Saltar de una capa a otra.** Un fallo en una capa de la aplicación terminó
+  dando ejecución en una capa completamente distinta de la pila. La lección: seguir
+  el dato hasta dónde cruza una **frontera de confianza**.
+- **Movimiento lateral y escalada por diseño, no por CVE.** Ni foothold ni root
+  salieron de un exploit público: fueron **errores de configuración y de diseño**
+  (confianza, permisos, exposición de sesión). Enumerar ganó a asumir, siempre.
+
+## Lo que me llevo
+
+- **No casarse con la narrativa que "encaja".** Perseguí un vector que tenía todo
+  el sentido temático... y era un callejón. Pararme a **verificar y descartarlo**
+  antes de invertir más tiempo fue lo que desatascó la caja. La hipótesis bonita
+  no es evidencia.
+- **Los mensajes de error son documentación gratis.** Un parser verboso te dibuja
+  su propia estructura si lo escuchas.
+- **"Dato de confianza" casi nunca lo es.** Si el usuario puede influir en un valor,
+  hay que asumir que lo hará con mala intención.
+- **La metodología importa más que el truco.** Enumerar a fondo, mapear fronteras
+  de privilegio y seguir el dato: eso es lo que resolvió, no un one-liner mágico.
+
+## Mentalidad de pentest profesional
+
+Mientras la resolvía fui contrastando la vía "CTF rápida" con cómo lo haría en un
+engagement real:
+
+- Confirmar hallazgos de forma **no destructiva** antes de ir a por ejecución.
+- **Minimizar impacto**: preferir leer/extraer sobre modificar, y hacer copia de
+  seguridad de cualquier fichero que sí haya que tocar.
+- **Documentar cada frontera cruzada** (qué dato, desde dónde, hasta dónde) como
+  hallazgo independiente, aunque formen una sola cadena.
+- **Cleanup**: no dejar artefactos (binarios, ficheros modificados) tras el PoC.
+
+---
+
+<Callout type="info">
+  Writeup completo con la cadena técnica cuando Dutybound retire. Si quieres
+  comentar algo mientras tanto, escríbeme.
+</Callout>
