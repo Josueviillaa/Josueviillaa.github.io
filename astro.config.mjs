@@ -11,6 +11,8 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   site: process.env.SITE_URL ?? 'http://localhost:4321',
   base: process.env.BASE_PATH || '/',
+  // Precarga los enlaces visibles para una navegación casi instantánea.
+  prefetch: { prefetchAll: true, defaultStrategy: 'viewport' },
   integrations: [
     mdx(),
     sitemap({

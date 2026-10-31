@@ -1,0 +1,50 @@
+---
+/**
+ * Aviso mínimo y honesto: la web no usa cookies de seguimiento, solo
+ * localStorage para tema e idioma. Se muestra una vez y se recuerda el cierre.
+ */
+import { withBase } from '../lib/url';
+import { getLang, useT } from '../i18n';
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+const privacyHref = withBase(lang === 'en' ? '/en/privacy/' : '/privacidad/');
+---
+
+<div
+  id="privacy-notice"
+  hidden
+  class="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/95 backdrop-blur-md"
+>
+  <div class="wrap flex flex-col gap-3 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+    <p class="text-muted">
+      {t('notice.text')}
+      <a href={privacyHref} class="link ml-1 font-mono">{t('notice.more')}</a>
+    </p>
+    <button
+      type="button"
+      data-privacy-ok
+      class="shrink-0 self-start rounded-md border border-line px-3 py-1.5 font-mono text-xs text-text transition-colors hover:border-accent hover:text-accent sm:self-auto"
+    >
+      {t('notice.ok')}
+    </button>
+  </div>
+</div>
+
+<script>
+  const KEY = 'privacy-ack';
+  const el = document.getElementById('privacy-notice');
+  if (el) {
+    let acked = false;
+    try {
+      acked = localStorage.getItem(KEY) === '1';
+    } catch {}
+    if (!acked) el.hidden = false;
+    el.querySelector<HTMLButtonElement>('[data-privacy-ok]')?.addEventListener('click', () => {
+      el.hidden = true;
+      try {
+        localStorage.setItem(KEY, '1');
+      } catch {}
+    });
+  }
+</script>

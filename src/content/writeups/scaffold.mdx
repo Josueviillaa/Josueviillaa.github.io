@@ -1,0 +1,377 @@
+---
+title: "Scaffold"
+platform: "HackTheBox"
+os: "Windows"
+difficulty: "Hard"
+date: 2026-10-31
+ports: ["53/dns", "88/kerberos", "389/ldap", "443/https", "445/smb", "3268/gc", "5985/winrm", "9389/adws", "9800/mdt", "9801/mdt"]
+tags: ["active-directory", "mdt", "xxe", "ldap-acl", "grouptype", "dcom", "adcs", "esc9", "certificate-mapping", "signed-msi"]
+summary: "Dominio Windows en el que ninguna pieza basta por sí sola: un XXE en el servicio de MDT filtra credenciales, una cadena de permisos LDAP y abuso de groupType reactiva una cuenta en cuarentena, y una debilidad de mapeo de certificados (UPN spoofing contra un build de Server 2022 anterior al hardening de mayo de 2022) termina concediendo el hash de Administrator."
+draft: false
+---
+
+Scaffold es una máquina **Hard de Active Directory** cuyo interés no está en un único fallo crítico, sino en **encadenar debilidades pequeñas** de varias tecnologías de entorno Windows: MDT, LDAP/ACLs, tipos de grupo, DCOM, AD CS, plantillas de certificado, PKINIT y despliegue de paquetes MSI.
+
+El objetivo es el habitual —`user.txt` y después `root.txt`—, pero la ruta real obliga a entender cómo interactúan esos sistemas entre sí y, sobre todo, a distinguir una vía *técnicamente válida* de la vía que *realmente cierra la máquina*.
+
+<Callout type="note">
+El recorrido incluye deliberadamente algún callejón sin salida (el flujo de aprobación del portal MSI). Documentarlo es parte del valor del ejercicio: en un entorno real, saber cuándo abandonar una rama es tan importante como la cadena que sí funciona.
+</Callout>
+
+<AttackChain
+  tag="ADCS"
+  label="del XXE de MDT a Administrator"
+  steps={[
+    { title: 'XXE en MDT', desc: 'El servicio de monitorización de MDT parsea XML con entidades externas → lectura de la configuración del deployment share.', action: 'credenciales de despliegue (svc_mdt, svc_deploy, r.wilson)' },
+    { title: 'ACLs LDAP + groupType', desc: 'Una cadena de permisos y el cambio de groupType reactivan m.carter, una cuenta en cuarentena.', action: 'ejecución por DCOM (MMC20)' },
+    { title: 'Ejecución como m.carter', desc: 'DCOM da ejecución de comandos → user.txt. Faltan privilegios: toca post-explotación.', action: 'certificados .pfx legibles en disco' },
+    { title: 'd.cooper vía PKINIT', desc: 'Un certificado de firma crackeado permite autenticar por certificado → hash de d.cooper (Remote Management + Package_Developers).', action: 'CreateChild delegado → cuenta de máquina' },
+    { title: 'Certificado de code signing', desc: 'La cuenta de máquina enrola PackagingCodeSigning (EnrolleeSuppliesSubject) → firma de MSI.', action: 'vía MSI firmada: válida, pero bloqueada por autorización', tone: 'pending' },
+    { title: 'UPN spoofing', desc: 'r.wilson escribe el userPrincipalName de m.carter como Administrator durante la emisión de un certificado User.', action: 'PKINIT con mapeo débil (build pre-mayo 2022)' },
+    { title: 'Administrator', desc: 'El certificado mapea a la cuenta Administrator real → hash NT → control del DC.', tone: 'win' },
+  ]}
+/>
+
+### Entorno
+
+| Elemento | Valor |
+| --- | --- |
+| Dominio | `scaffold.htb` |
+| Controlador de dominio | `dc.scaffold.htb` |
+| Portal interno | `portal.scaffold.htb` |
+| SO | Windows Server 2022 (build 20348) |
+
+<Callout type="tip">
+Kerberos aparece en casi todas las fases. Conviene preparar desde el principio un `krb5.conf` dedicado al dominio y tener a mano la sincronización de reloj con el DC: buena parte de los "errores raros" de esta máquina son, en realidad, desfase horario.
+</Callout>
+
+## Reconocimiento
+
+### Superficie expuesta
+
+La máquina es un **controlador de dominio** con un gran número de puertos abiertos. Más allá de los servicios habituales de AD (DNS, Kerberos, LDAP, SMB, WinRM), destacan un par de puertos altos asociados a la monitorización de **Microsoft Deployment Toolkit (MDT)**:
+
+```text
+9800 / 9801   → MDT monitoring
+443           → portal.scaffold.htb (IIS, autenticación integrada)
+```
+
+El vhost `portal.scaffold.htb` responde con autenticación Windows integrada (Negotiate/NTLM), señal de una aplicación interna que se explorará más adelante.
+
+<Callout type="note">
+Añadir los hostnames al `/etc/hosts` desde el principio evita problemas de resolución en fases posteriores (especialmente con Kerberos, que es sensible a nombres).
+</Callout>
+
+### El XXE de MDT
+
+El servicio de monitorización de MDT procesa XML proporcionado por el cliente a través de un parser que mantiene activa la resolución de entidades externas. Eso permite un **XXE** con exfiltración *out-of-band*: se aloja un DTD malicioso en la máquina atacante, el servidor lo solicita y devuelve el contenido del fichero objetivo a un listener propio.
+
+Los ficheros interesantes son los de configuración del *deployment share*:
+
+```text
+Control\Bootstrap.ini
+Control\CustomSettings.ini
+```
+
+### Credenciales recuperadas
+
+De `Bootstrap.ini` y `CustomSettings.ini` se obtienen varias identidades de despliegue:
+
+```ini
+[Default]
+UserID=svc_mdt
+UserPassword=************
+UserDomain=scaffold.htb
+
+JoinDomain=scaffold.htb
+DomainAdmin=svc_deploy
+DomainAdminPassword=************
+MachineObjectOU=OU=Workstations,OU=Computers,DC=scaffold,DC=htb
+```
+
+<Callout type="warning">
+Las dos credenciales de `svc_deploy` se diferencian en **un solo carácter** (una letra `o` frente a un cero `0`). Sólo una de ellas es válida. Es un detalle pensado para hacer perder tiempo: conviene tratar cada variante como una candidata independiente y validarla antes de darla por buena.
+</Callout>
+
+Un detalle relevante del diseño: la contraseña de `svc_deploy` aparece **reutilizada** por una cuenta de persona, `r.wilson`. Esa reutilización será clave en la fase de escalada.
+
+| Identidad | Origen | Uso posterior |
+| --- | --- | --- |
+| `svc_mdt` | Bootstrap.ini | Acceso al share de despliegue |
+| `svc_deploy` | CustomSettings.ini | Escritura sobre grupos / cuenta de servicio |
+| `r.wilson` | Reutilización de contraseña | Control sobre `m.carter` (escalada) |
+
+<Callout type="tip">
+Tratar **cada credencial descubierta como una posible conexión al siguiente paso** es la mentalidad correcta en una máquina de este tipo. Ninguna de estas cuentas, por sí sola, lleva al objetivo; su valor está en lo que permite modificar en el dominio.
+</Callout>
+
+## Foothold
+
+El foothold no viene de un exploit, sino de **encadenar permisos de Active Directory** hasta reactivar una cuenta deliberadamente restringida.
+
+### La cuenta objetivo: m.carter
+
+`m.carter` es una cuenta de dominio válida cuya contraseña aparece en la configuración de MDT, pero que está **doblemente restringida**:
+
+- Puede estar **deshabilitada** (`ACCOUNTDISABLE` en `userAccountControl`).
+- Pertenece al grupo **`Quarantined_Accounts`**, cuyo SID está incluido en una GPO con `SeDenyNetworkLogonRight` (denegación de logon de red).
+
+El efecto práctico es que, aun con contraseña válida, cualquier intento de autenticación por red (SMB, WinRM, WMI) devuelve `STATUS_LOGON_TYPE_NOT_GRANTED`.
+
+### Paso 1 — Cadena de ACLs hasta m.carter
+
+`r.wilson` (gracias a la reutilización de contraseña) puede auto-añadirse a `Helpdesk Operator`, grupo que a su vez tiene `GenericWrite` sobre `m.carter`:
+
+```bash
+bloodyAD --host "$IP" -d scaffold.htb -u r.wilson -p '<pass>' \
+  add groupMember "Helpdesk Operator" r.wilson
+
+bloodyAD --host "$IP" -d scaffold.htb -u r.wilson -p '<pass>' \
+  remove uac m.carter -f ACCOUNTDISABLE
+```
+
+### Paso 2 — El truco del groupType
+
+Aquí está la parte más interesante del foothold. La denegación de logon se aplica **por el SID del grupo presente en el token** del usuario. Y un grupo de **distribución** no introduce su SID en el token de seguridad (a diferencia de uno de **seguridad**).
+
+`svc_deploy`, a través del grupo `Identity_Operations`, tiene permiso de escritura sobre la propiedad `groupType` de `Quarantined_Accounts` —aunque **no** sobre su atributo `member`—. Convirtiendo el grupo de *seguridad universal* a *distribución*, su SID deja de computar en el token de `m.carter`:
+
+```bash
+# Quarantined_Accounts: seguridad universal (-2147483640) -> distribución (2)
+bloodyAD --host "$IP" -d scaffold.htb -u svc_deploy -p '<pass>' \
+  set object 'CN=Quarantined_Accounts,OU=Scaffold,DC=scaffold,DC=htb' \
+  groupType -v 2
+```
+
+<Callout type="note">
+Es una vía elegante y poco evidente: no se puede *sacar* a la cuenta del grupo (no hay permiso sobre `member`), pero sí se puede **neutralizar el grupo entero** cambiando su naturaleza. La GPO sigue existiendo; simplemente deja de aplicarse porque el SID ya no viaja en el token.
+</Callout>
+
+El mismo patrón de abuso de `groupType` se usa sobre el grupo `IT` (convertido a grupo de seguridad) para que la membresía de `m.carter` empiece a surtir efecto en la cadena.
+
+Verificación de que la cuenta ya autentica por red:
+
+```bash
+nxc smb "$IP" -u m.carter -p '<pass>'      # ahora responde [+]
+```
+
+### Paso 3 — Ejecución como m.carter (DCOM)
+
+`m.carter` no obtiene una shell de WinRM directa, pero sí **ejecución mediante DCOM** a través del objeto `MMC20.Application`. La recuperación de salida de `dcomexec` depende de acceso SMB que la cuenta no tiene, así que se ejecuta en modo ciego y se exfiltra la salida por HTTP:
+
+```bash
+dcomexec.py -nooutput -object MMC20 \
+  'scaffold.htb/m.carter@<IP>' '<comando que hace POST a mi listener>'
+```
+
+<Callout type="tip">
+La ejecución DCOM sobre un DC moderno es sensible a: (1) el reloj —Kerberos no tolera desfase—, y (2) el tipo de ticket. Un ticket RC4 puede fallar el sellado del canal RPC donde uno AES funciona. Si aparece `invalid_checksum` en el bind, el problema casi nunca es de permisos: es el reloj o el tipo de cifrado del ticket.
+</Callout>
+
+Con ejecución de comandos como `m.carter` se completa el acceso de usuario y se obtiene `user.txt`. A partir de aquí, el objetivo es Administrator.
+
+## Movimiento lateral
+
+Con ejecución como `m.carter` empieza la fase de *post-explotación*: buscar en el sistema material que lleve a una identidad con más privilegio.
+
+### Certificados de firma en disco
+
+En el área de desarrollo del DC existen dos ficheros PKCS#12 legibles por `m.carter`:
+
+```text
+C:\Dev\DevCerts\InternalCodeSigning_01.pfx
+C:\Dev\DevCerts\InternalCodeSigning_02.pfx
+```
+
+Se exfiltran (preferiblemente copiándolos a un recurso controlado por SMB, más fiable que un base64 largo por una shell ciega) y se crackea su contraseña con John the Ripper:
+
+```bash
+pfx2john InternalCodeSigning_01.pfx > pfx.hash
+john pfx.hash --wordlist=/usr/share/wordlists/rockyou.txt
+```
+
+Ambos certificados comparten contraseña. Inspeccionándolos con OpenSSL:
+
+| Fichero | Identidad | EKU |
+| --- | --- | --- |
+| `InternalCodeSigning_01.pfx` | Daniel Cooper (`d.cooper`) | Client Authentication + Code Signing |
+| `InternalCodeSigning_02.pfx` | Tom Walker (`t.walker`) | Client Authentication + Code Signing |
+
+<Callout type="note">
+El certificado de `t.walker` **no** resulta utilizable para PKINIT: el KDC lo rechaza con `KDC_ERR_CLIENT_NOT_TRUSTED`. Un EKU de *Client Authentication* no garantiza que un certificado sirva para autenticación de dominio. El de `d.cooper`, en cambio, sí funciona.
+</Callout>
+
+### PKINIT como d.cooper
+
+El certificado de `d.cooper` permite autenticación por certificado (PKINIT), de la que se extrae su hash NT:
+
+```bash
+certipy-ad auth -pfx InternalCodeSigning_01.pfx -password '<pass>' \
+  -username d.cooper -domain scaffold.htb -dc-ip "$IP"
+```
+
+`d.cooper` es una identidad mucho más cómoda: pertenece a **`Remote Management Users`** (WinRM interactivo) y a **`Package_Developers`**, lo que resulta clave para la siguiente fase.
+
+```bash
+evil-winrm -i "$IP" -u d.cooper -H '<hash>'
+```
+
+### AD CS: la plantilla de code signing
+
+Enumerando la CA (`scaffold-DC-CA`) aparecen dos plantillas relevantes:
+
+- **`InternalCodeSigning`** — el subject lo construye AD, no el solicitante.
+- **`PackagingCodeSigning`** — permite que el solicitante **suministre el subject** (`EnrolleeSuppliesSubject`) y la pueden enrolar los **Domain Computers**.
+
+<Callout type="note">
+Certipy también marca **ESC8** (web enrollment por HTTPS sin channel binding). Es una vía plausible sobre el papel, pero en la práctica los intentos de relay chocan con el endpoint devolviendo `401` y con protecciones de LDAPS. No todo hallazgo de ESC8 se traduce en un certificado privilegiado: hace falta una fuente de autenticación adecuada, un target de relay compatible y una plantilla útil a la vez.
+</Callout>
+
+### La cuenta de máquina (CreateChild delegado)
+
+`PackagingCodeSigning` exige ser **Domain Computer** para enrolarla, así que hace falta una cuenta de máquina. El `ms-DS-MachineAccountQuota` está a **0**, de modo que la vía habitual no sirve… pero `Package_Developers` (al que pertenece `d.cooper`) tiene **`CreateChild` delegado sobre una OU concreta**:
+
+```text
+OU=Dev_Machines,OU=Packaging_Team,OU=Scaffold,DC=scaffold,DC=htb
+```
+
+<Callout type="tip">
+`MachineAccountQuota` no es el único mecanismo que permite crear equipos: un permiso explícito de `CreateChild` sobre una OU lo habilita aunque la cuota sea 0. Es un matiz de AD fácil de pasar por alto.
+</Callout>
+
+Creación de la cuenta dentro de esa OU:
+
+```bash
+addcomputer.py -k -no-pass -method LDAPS \
+  -dc-host dc.scaffold.htb -dc-ip "$IP" \
+  -computer-name 'SCAFFOLDDEV01$' -computer-pass '<pass>' \
+  -computer-group 'OU=Dev_Machines,OU=Packaging_Team,OU=Scaffold,DC=scaffold,DC=htb' \
+  'scaffold.htb/d.cooper'
+```
+
+Con la cuenta de máquina ya se puede solicitar el certificado de code signing con el subject que espera el sistema de despliegue:
+
+```bash
+certipy-ad req -u 'SCAFFOLDDEV01$@scaffold.htb' -p '<pass>' \
+  -dc-ip "$IP" -ca scaffold-DC-CA -template PackagingCodeSigning \
+  -subject 'CN=Package_Developers'
+```
+
+El certificado resultante (`CN=Package_Developers`, emitido por `scaffold-DC-CA`, EKU *Code Signing*) permite firmar un MSI que el portal interno acepta como legítimo. Esa vía se explora —y se agota— en la siguiente sección.
+
+## Escalada a Administrator
+
+Esta fase tiene dos partes: una vía que **funciona técnicamente pero no cierra la máquina**, y la que finalmente concede Administrator. Documentar ambas es útil porque refleja el proceso real de resolución.
+
+### Vía A — MSI firmado (parcial)
+
+El portal interno (`portal.scaffold.htb`) es una aplicación ASP.NET cuyo código fuente es legible en el DC (`C:\Dev\Build\ScaffoldPortal`). Gestiona un flujo de despliegue de paquetes MSI con tres roles:
+
+```text
+PackageDeveloper -> Package_Developers      (sube paquetes)
+PackageValidator -> Package_Validators      (valida)
+DeploymentAdmin  -> Deployment_Admins       (aprueba y despliega)
+```
+
+El motor `Deploy-Engine.ps1` se ejecuta como **SYSTEM** e instala los paquetes aprobados. Un MSI firmado con el certificado `CN=Package_Developers` y con el `ProductCode`/versión que espera la política pasa **toda** la validación del servidor.
+
+<Callout type="note">
+Para que el paquete supere el validador hay que imitar una app del repositorio. 7-Zip tiene un allowlist de hashes (`hashes.json`) que lo descarta; PuTTY no, así que es mejor base. El MSI se construye con `wixl` y se firma con `osslsigncode`.
+</Callout>
+
+El paquete malicioso se sube correctamente como `d.cooper` y el validador lo acepta: firma válida, `ProductCode` correcto, versión aceptada. Sin embargo, el **paso de aprobación** requiere pertenecer a `Package_Validators` o `Deployment_Admins`, y `d.cooper` no está en ninguno.
+
+<Callout type="warning">
+Un ataque puede ser técnicamente impecable y aun así no terminar la máquina. El MSI era válido en todos los sentidos; el bloqueo era de **autorización**, no técnico. Reconocerlo a tiempo evita insistir en una rama agotada y empuja a volver a enumerar Active Directory.
+</Callout>
+
+### Vía B — UPN spoofing y mapeo débil de certificados
+
+El punto de inflexión está en lo que `r.wilson` puede modificar sobre `m.carter`. Entre sus atributos escribibles está **`userPrincipalName`**.
+
+Dos piezas se combinan:
+
+1. La plantilla de certificado **`User`** construye la identidad del certificado a partir de atributos de AD (incluido el UPN), no de un subject libre.
+2. El DC corre un build de **Windows Server 2022 (20348.587)**, anterior al *hardening* de mapeo de certificados de mayo de 2022. En ese estado, el mapeo **débil por UPN** sigue siendo posible.
+
+<Callout type="note">
+La cuenta `Administrator` no tiene un UPN propio asignado. Eso es justo lo que hace viable el ataque: al poner `Administrator` como UPN de otra cuenta y pedir el certificado, el KDC —en un build sin hardening— lo resuelve a la cuenta Administrator real.
+</Callout>
+
+#### Secuencia
+
+```bash
+# 1. r.wilson fija temporalmente el UPN de m.carter a "Administrator"
+ldapmodify -x -H ldap://"$IP" -D 'r.wilson@scaffold.htb' -w '<pass>' <<'LDIF'
+dn: CN=m.carter,OU=Users,OU=Scaffold,DC=scaffold,DC=htb
+changetype: modify
+replace: userPrincipalName
+userPrincipalName: Administrator
+-
+add: mail
+mail: m.carter@scaffold.htb
+LDIF
+
+# 2. se solicita el certificado "User" como m.carter
+certipy-ad req -u 'm.carter@scaffold.htb' -p '<pass>' \
+  -dc-ip "$IP" -target dc.scaffold.htb -ca 'scaffold-DC-CA' -template 'User'
+#    -> certificado con SAN UPN: Administrator
+
+# 3. se restaura el UPN real de m.carter (imprescindible para el mapeo)
+ldapmodify -x -H ldap://"$IP" -D 'r.wilson@scaffold.htb' -w '<pass>' <<'LDIF'
+dn: CN=m.carter,OU=Users,OU=Scaffold,DC=scaffold,DC=htb
+changetype: modify
+replace: userPrincipalName
+userPrincipalName: m.carter@scaffold.htb
+LDIF
+
+# 4. PKINIT con el certificado -> hash NT de Administrator
+certipy-ad auth -pfx administrator.pfx \
+  -username administrator -domain scaffold.htb -dc-ip "$IP"
+```
+
+<Callout type="tip">
+El orden importa: el UPN *spoofeado* debe estar presente **sólo** durante la emisión del certificado. Al restaurarlo antes de autenticar, el único objeto con ese UPN en el momento del mapeo es Administrator, y el certificado se asocia a esa cuenta.
+</Callout>
+
+#### Acceso final
+
+Con el hash de Administrator, acceso administrativo al DC y lectura de la flag:
+
+```bash
+evil-winrm -i "$IP" -u Administrator -H '<hash>'
+```
+
+Esto completa el compromiso del dominio.
+
+### Nota sobre el camino
+
+El esfuerzo de la vía A **no es desperdiciado**: demuestra control de una cuenta de máquina, emisión de un certificado de firma confiable, construcción y firmado de un MSI conforme a la política y superación de la validación del servidor. El único bloqueo era la autorización del workflow. La máquina fuerza precisamente a reconocer esa diferencia y a reorientar la enumeración hacia las ACLs de AD, que es donde estaba la vía definitiva.
+
+## Lecciones y mitigaciones
+
+| # | Debilidad | Impacto | Mitigación |
+| --- | --- | --- | --- |
+| 1 | XXE en el servicio de monitorización de MDT | Lectura de ficheros de configuración con credenciales | Deshabilitar resolución de entidades externas en el parser XML; no exponer la monitorización de MDT a la red |
+| 2 | Credenciales en texto claro en el deployment share | Acceso inicial al dominio | No almacenar credenciales en ficheros de configuración; usar cuentas gestionadas (gMSA) |
+| 3 | Reutilización de contraseña (`svc_deploy` / `r.wilson`) | Pivot entre cuenta de servicio y usuario | Contraseñas únicas por cuenta; rotación y auditoría |
+| 4 | ACLs excesivas (`GenericWrite` sobre `m.carter`, write de `groupType`) | Reactivación de una cuenta restringida | Principio de mínimo privilegio en delegaciones; revisar ACLs con BloodHound de forma periódica |
+| 5 | Cuarentena basada sólo en tipo de grupo | Bypass cambiando `groupType` a distribución | No depender del tipo de grupo para controles de seguridad; aplicar restricciones por atributo de cuenta o políticas de autenticación |
+| 6 | Certificados de firma legibles en disco | Obtención de identidades vía PKINIT | Proteger el material PKCS#12; no dejar `.pfx` con claves privadas accesibles |
+| 7 | `CreateChild` delegado sobre una OU (con MAQ=0) | Creación de cuenta de máquina | Revisar delegaciones de creación de objetos; separar de la cuota global |
+| 8 | Plantilla con `EnrolleeSuppliesSubject` | Emisión de certificado de firma a medida | Restringir plantillas que permiten subject arbitrario; aprobación por responsable |
+| 9 | Mapeo débil de certificados (build pre-mayo 2022) + UPN escribible | Suplantación de Administrator vía PKINIT | Aplicar el hardening de mapeo de certificados (KB5014754 / modo *Full Enforcement*); restringir escritura de `userPrincipalName` |
+
+### Conclusiones
+
+<Callout type="note">
+La idea central de Scaffold es que **la cadena vale más que cualquier pieza suelta**. Cada fallo, por separado, tiene impacto limitado; combinados, llevan del acceso anónimo a Administrator.
+</Callout>
+
+**Desde la perspectiva defensiva**, los puntos más críticos son el mapeo débil de certificados (el que concede el compromiso total) y el conjunto de ACLs sobre-delegadas que permiten modificar atributos sensibles como `userPrincipalName`. Ambos son configuraciones, no vulnerabilidades de software: pasan desapercibidas precisamente por eso.
+
+**Desde la perspectiva ofensiva**, el ejercicio refuerza una disciplina concreta: distinguir una vía *válida* de la vía que *cierra el objetivo*. La ruta del MSI firmado era correcta en todos sus pasos técnicos y aun así no terminaba la máquina; insistir en ella habría sido tiempo perdido. Volver a enumerar las ACLs de AD fue lo que destapó el camino final.
+
+### Tecnologías tocadas
+
+Active Directory · LDAP/ACLs · tipos de grupo · Kerberos/PKINIT · DCOM · AD CS · plantillas de certificado · mapeo de certificados (ESC9/ESC10) · code signing · despliegue de MSI · autenticación integrada de Windows · NTFS.

@@ -1,0 +1,59 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { site } from '../config/site';
+---
+
+<BaseLayout title="Privacidad" description="Política de privacidad de la web de Josu: sin cookies de seguimiento.">
+  <section class="wrap max-w-2xl py-16 sm:py-20">
+    <h1 class="text-4xl font-bold sm:text-5xl">Privacidad</h1>
+    <p class="mt-4 text-muted">Resumen honesto de qué datos toca esta web. Spoiler: casi ninguno.</p>
+
+    <div class="mt-10 space-y-6 text-muted">
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Cookies y seguimiento</h2>
+        <p class="mt-2">
+          Esta web <strong class="text-text">no usa cookies de seguimiento</strong> ni analítica de terceros.
+          No hay rastreadores, ni píxeles, ni perfiles publicitarios.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Qué se guarda en tu navegador</h2>
+        <p class="mt-2">
+          Solo tus <strong class="text-text">preferencias</strong>, en el almacenamiento local del navegador
+          (<code class="font-mono text-sm">localStorage</code>) y nunca enviadas a ningún servidor:
+        </p>
+        <ul class="mt-3 list-disc space-y-1 pl-5">
+          <li>el <strong class="text-text">tema</strong> (claro u oscuro),</li>
+          <li>el <strong class="text-text">idioma</strong> elegido,</li>
+          <li>si ya cerraste este aviso de privacidad.</li>
+        </ul>
+        <p class="mt-3">Puedes borrarlas en cualquier momento limpiando los datos del sitio en tu navegador.</p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Alojamiento</h2>
+        <p class="mt-2">
+          El sitio se sirve como páginas estáticas desde <strong class="text-text">GitHub Pages</strong>, que,
+          como cualquier servidor web, puede registrar datos técnicos de acceso (dirección IP, user-agent) en
+          sus propios logs. Eso queda fuera del control de esta web y se rige por la política de GitHub.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Enlaces externos y fuentes</h2>
+        <p class="mt-2">
+          Los enlaces a GitHub, LinkedIn y HackTheBox te llevan a sus sitios, cada uno con su propia política.
+          Las tipografías se cargan desde <strong class="text-text">Google Fonts</strong>.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Contacto</h2>
+        <p class="mt-2">
+          ¿Dudas? Escríbeme a <code class="font-mono text-sm text-text">{site.email}</code>.
+        </p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

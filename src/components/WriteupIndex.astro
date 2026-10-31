@@ -9,6 +9,27 @@ const t = useT(lang);
 
 const writeups = await getWriteups();
 const countWord = writeups.length === 1 ? t('writeups.count_one') : t('writeups.count_many');
+
+// Normaliza el SO a su familia (Windows / Linux) para filtrar.
+const osFamily = (os: string) => (os.toLowerCase().startsWith('windows') ? 'windows' : 'linux');
+
+// Chips de filtro: SO presentes + áreas destacadas que aparezcan en los tags.
+const allTags = new Set(writeups.flatMap((w) => w.data.tags.map((x) => x.toLowerCase())));
+const osPresent = [...new Set(writeups.map((w) => osFamily(w.data.os)))];
+
+const highlightTags = [
+  { value: 'active-directory', label: 'Active Directory' },
+  { value: 'adcs', label: 'ADCS' },
+  { value: 'web', label: 'Web' },
+].filter((h) => allTags.has(h.value));
+
+const osLabels: Record<string, string> = { windows: 'Windows', linux: 'Linux' };
+
+const filters = [
+  { type: 'all', value: 'all', label: t('filter.all') },
+  ...osPresent.map((o) => ({ type: 'os', value: o, label: osLabels[o] ?? o })),
+  ...highlightTags.map((h) => ({ type: 'tag', value: h.value, label: h.label })),
+];
 ---
 
 <section class="wrap pt-10 pb-20 sm:pt-12 sm:pb-24">
@@ -25,17 +46,43 @@ const countWord = writeups.length === 1 ? t('writeups.count_one') : t('writeups.
       <span class="h-px w-8 bg-line-strong" aria-hidden="true"></span>
       <span>{t('writeups.kicker')}</span>
       <span class="text-line-strong">·</span>
-      <span>{writeups.length} {countWord}</span>
+      <span><span data-count>{writeups.length}</span> {countWord}</span>
     </p>
     <h1 class="text-4xl font-bold sm:text-5xl">{t('writeups.title')}</h1>
     <p class="max-w-2xl text-muted">{t('writeups.intro')}</p>
   </header>
 
   {
+    writeups.length > 0 && filters.length > 2 && (
+      <div class="mt-8 flex flex-wrap gap-2" role="group" aria-label={t('filter.aria')}>
+        {filters.map((f, i) => (
+          <button
+            type="button"
+            data-filter-type={f.type}
+            data-filter-value={f.value}
+            aria-pressed={i === 0 ? 'true' : 'false'}
+            class:list={[
+              'rounded-full border px-3 py-1 font-mono text-xs transition-colors',
+              i === 0
+                ? 'border-accent/50 bg-accent-soft text-accent'
+                : 'border-line text-muted hover:border-line-strong hover:text-text',
+            ]}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+    )
+  }
+
+  {
     writeups.length ? (
-      <ul class="mt-10 grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
+      <ul
+        data-writeup-grid
+        class="mt-8 grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]"
+      >
         {writeups.map((entry) => (
-          <li>
+          <li data-os={osFamily(entry.data.os)} data-tags={entry.data.tags.map((x) => x.toLowerCase()).join(' ')}>
             <MachineCard entry={entry} />
           </li>
         ))}
@@ -45,3 +92,36 @@ const countWord = writeups.length === 1 ? t('writeups.count_one') : t('writeups.
     )
   }
 </section>
+
+<script>
+  const buttons = document.querySelectorAll<HTMLButtonElement>('[data-filter-type]');
+  const items = document.querySelectorAll<HTMLLIElement>('[data-writeup-grid] > li');
+  const counter = document.querySelector<HTMLElement>('[data-count]');
+
+  function apply(type: string, value: string) {
+    let shown = 0;
+    items.forEach((li) => {
+      let match = true;
+      if (type === 'os') match = li.dataset.os === value;
+      else if (type === 'tag') match = (li.dataset.tags ?? '').split(' ').includes(value);
+      li.hidden = !match;
+      if (match) shown++;
+    });
+    if (counter) counter.textContent = String(shown);
+  }
+
+  buttons.forEach((btn) =>
+    btn.addEventListener('click', () => {
+      buttons.forEach((b) => {
+        const on = b === btn;
+        b.setAttribute('aria-pressed', String(on));
+        b.classList.toggle('border-accent/50', on);
+        b.classList.toggle('bg-accent-soft', on);
+        b.classList.toggle('text-accent', on);
+        b.classList.toggle('border-line', !on);
+        b.classList.toggle('text-muted', !on);
+      });
+      apply(btn.dataset.filterType!, btn.dataset.filterValue!);
+    }),
+  );
+</script>

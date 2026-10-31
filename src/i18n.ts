@@ -65,6 +65,11 @@ const ui = {
 
     'a11y.skip': 'Saltar al contenido',
     'footer.note': 'Construido con Astro · contenido educativo sobre entornos autorizados',
+    'privacy.nav': 'privacidad',
+    'privacy.title': 'Privacidad',
+    'notice.text': 'Esta web solo guarda tus preferencias (tema e idioma) en tu navegador. Sin cookies de seguimiento.',
+    'notice.ok': 'Entendido',
+    'notice.more': 'Más info',
 
     'hero.aria': 'Resumen de perfil',
     'hero.cmd': 'cat perfil.txt',
@@ -93,6 +98,8 @@ const ui = {
     'writeups.empty': 'Aún no hay writeups publicados.',
     'writeups.all': 'Ver todos los writeups',
     'writeups.back': 'inicio',
+    'filter.all': 'Todas',
+    'filter.aria': 'Filtrar máquinas',
     'writeups.count_one': 'máquina',
     'writeups.count_many': 'máquinas',
 
@@ -145,6 +152,11 @@ const ui = {
 
     'a11y.skip': 'Skip to content',
     'footer.note': 'Built with Astro · educational content on authorized environments',
+    'privacy.nav': 'privacy',
+    'privacy.title': 'Privacy',
+    'notice.text': 'This site only stores your preferences (theme and language) in your browser. No tracking cookies.',
+    'notice.ok': 'Got it',
+    'notice.more': 'Learn more',
 
     'hero.aria': 'Profile summary',
     'hero.cmd': 'cat profile.txt',
@@ -173,6 +185,8 @@ const ui = {
     'writeups.empty': 'No write-ups published yet.',
     'writeups.all': 'View all write-ups',
     'writeups.back': 'home',
+    'filter.all': 'All',
+    'filter.aria': 'Filter machines',
     'writeups.count_one': 'machine',
     'writeups.count_many': 'machines',
 

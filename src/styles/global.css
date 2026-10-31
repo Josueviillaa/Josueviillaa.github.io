@@ -289,6 +289,14 @@
   font-size: 1.1875rem;
 }
 
+.writeup h4 {
+  margin-top: 1.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
 .writeup p,
 .writeup li { color: var(--text-muted); }
 .writeup strong { color: var(--text); font-weight: 600; }
