@@ -5,7 +5,7 @@ import { withBase } from '../lib/url';
 import { getLang, homeHref, useT } from '../i18n';
 
 interface Props {
-  /** En la home los enlaces son anclas puras; desde un writeup apuntan a la home. */
+  /** En la home los enlaces de ancla son puros; desde otra página apuntan a la home. */
   isHome?: boolean;
 }
 
@@ -13,22 +13,30 @@ const { isHome = false } = Astro.props;
 
 const lang = getLang(Astro.url);
 const t = useT(lang);
+const home = homeHref(lang);
+const path = Astro.url.pathname;
 
-const sections = [
-  { id: 'sobre-mi', label: t('nav.about') },
-  { id: 'skills', label: t('nav.skills') },
-  { id: 'certificaciones', label: t('nav.certs') },
-  { id: 'writeups', label: t('nav.writeups') },
-  { id: 'contacto', label: t('nav.contact') },
+// Ruta con prefijo de idioma para las páginas aparte (writeups, notas).
+const pageHref = (p: string) => withBase(lang === 'en' ? `/en${p}` : p);
+
+// El nav mezcla anclas de la home (sobre mí, skills…) con páginas propias
+// (writeups, notas): "writeups" lleva a su listado, no hace scroll.
+type NavItem =
+  | { kind: 'anchor'; id: string; label: string }
+  | { kind: 'page'; href: string; label: string };
+
+const items: NavItem[] = [
+  { kind: 'anchor', id: 'sobre-mi', label: t('nav.about') },
+  { kind: 'anchor', id: 'skills', label: t('nav.skills') },
+  { kind: 'anchor', id: 'certificaciones', label: t('nav.certs') },
+  { kind: 'page', href: pageHref('/writeups/'), label: t('nav.writeups') },
+  { kind: 'anchor', id: 'contacto', label: t('nav.contact') },
+  { kind: 'page', href: pageHref('/notas/'), label: t('nav.notes') },
 ];
 
-// En la home del idioma actual, anclas puras; si no, a la home de ese idioma.
-const home = homeHref(lang);
-const href = (id: string) => (isHome ? `#${id}` : `${home}#${id}`);
-
-// "notas" es una página aparte (no un ancla de la home).
-const notasHref = withBase(lang === 'en' ? '/en/notas/' : '/notas/');
-const notasNum = String(sections.length + 1).padStart(2, '0');
+const anchorHref = (id: string) => (isHome ? `#${id}` : `${home}#${id}`);
+const isActivePage = (href: string) => path.startsWith(href);
+const num = (i: number) => String(i + 1).padStart(2, '0');
 ---
 
 <header class="sticky top-0 z-50 border-b border-line bg-bg/85 backdrop-blur-md">
@@ -40,21 +48,28 @@ const notasNum = String(sections.length + 1).padStart(2, '0');
     <div class="flex items-center gap-4 sm:gap-6">
       <ul class="hidden items-center gap-6 font-mono text-[0.8125rem] md:flex">
         {
-          sections.map((s, i) => (
-            <li>
-              <a href={href(s.id)} data-nav-link={s.id} class="text-muted transition-colors hover:text-text">
-                <span class="text-faint">{String(i + 1).padStart(2, '0')}.</span>
-                {s.label}
-              </a>
-            </li>
-          ))
+          items.map((item, i) =>
+            item.kind === 'anchor' ? (
+              <li>
+                <a href={anchorHref(item.id)} data-nav-link={item.id} class="text-muted transition-colors hover:text-text">
+                  <span class="text-faint">{num(i)}.</span>
+                  {item.label}
+                </a>
+              </li>
+            ) : (
+              <li>
+                <a
+                  href={item.href}
+                  aria-current={isActivePage(item.href) ? 'page' : undefined}
+                  class:list={['transition-colors hover:text-text', isActivePage(item.href) ? 'text-accent' : 'text-muted']}
+                >
+                  <span class="text-faint">{num(i)}.</span>
+                  {item.label}
+                </a>
+              </li>
+            ),
+          )
         }
-        <li>
-          <a href={notasHref} class="text-muted transition-colors hover:text-text">
-            <span class="text-faint">{notasNum}.</span>
-            {t('nav.notes')}
-          </a>
-        </li>
       </ul>
 
       <div class="flex items-center gap-2 sm:gap-3">
@@ -79,21 +94,28 @@ const notasNum = String(sections.length + 1).padStart(2, '0');
   <div id="nav-menu" hidden class="border-t border-line md:hidden">
     <ul class="wrap flex flex-col py-2 font-mono text-sm">
       {
-        sections.map((s, i) => (
-          <li>
-            <a href={href(s.id)} data-nav-link={s.id} class="flex gap-3 py-2.5 text-muted hover:text-text">
-              <span class="text-faint">{String(i + 1).padStart(2, '0')}.</span>
-              {s.label}
-            </a>
-          </li>
-        ))
+        items.map((item, i) =>
+          item.kind === 'anchor' ? (
+            <li>
+              <a href={anchorHref(item.id)} data-nav-link={item.id} class="flex gap-3 py-2.5 text-muted hover:text-text">
+                <span class="text-faint">{num(i)}.</span>
+                {item.label}
+              </a>
+            </li>
+          ) : (
+            <li>
+              <a
+                href={item.href}
+                aria-current={isActivePage(item.href) ? 'page' : undefined}
+                class:list={['flex gap-3 py-2.5 hover:text-text', isActivePage(item.href) ? 'text-accent' : 'text-muted']}
+              >
+                <span class="text-faint">{num(i)}.</span>
+                {item.label}
+              </a>
+            </li>
+          ),
+        )
       }
-      <li>
-        <a href={notasHref} class="flex gap-3 py-2.5 text-muted hover:text-text">
-          <span class="text-faint">{notasNum}.</span>
-          {t('nav.notes')}
-        </a>
-      </li>
     </ul>
   </div>
 </header>
@@ -116,7 +138,7 @@ const notasNum = String(sections.length + 1).padStart(2, '0');
   menu?.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => setOpen(false)));
   document.addEventListener('keydown', (e) => e.key === 'Escape' && setOpen(false));
 
-  // Resalta la sección visible
+  // Resalta la sección de la home visible (solo anclas)
   const links = document.querySelectorAll<HTMLAnchorElement>('[data-nav-link]');
   const targets = [...new Set([...links].map((l) => l.dataset.navLink))]
     .map((id) => document.getElementById(id!))
