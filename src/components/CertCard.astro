@@ -12,15 +12,13 @@ const lang = getLang(Astro.url);
 const t = useT(lang);
 
 const statusLabel = t(`cert.status.${cert.status}` as 'cert.status.obtenida');
-// El código largo (eCPPT) necesita algo menos de tamaño en el emblema.
 const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
 ---
 
-<article class:list={['cert-card', `is-${cert.status}`]}>
-  <span class="cert-sheen" aria-hidden="true"></span>
-
+<article class:list={['cert-card', `is-${cert.status}`]} data-cert-card>
   <div class="cert-badge" aria-hidden="true">
     <span class="cert-badge-face">
+      <span class="cert-holo"></span>
       <span class:list={['cert-badge-code', codeSize]}>{cert.code}</span>
     </span>
   </div>
@@ -50,27 +48,17 @@ const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
 </article>
 
 <style>
+  /* Tarjeta: minimalista y estática. Todo el "efecto" vive en la badge. */
   .cert-card {
-    position: relative;
     display: flex;
     align-items: center;
     gap: 1.25rem;
-    overflow: hidden;
     border: 1px solid var(--line);
     border-left-width: 2px;
     border-radius: 0 0.7rem 0.7rem 0;
-    background: linear-gradient(180deg, color-mix(in srgb, var(--text) 3%, var(--surface)), var(--surface));
+    background: var(--surface);
     padding: 1.4rem 1.5rem;
-    box-shadow:
-      inset 0 1px 0 color-mix(in srgb, #ffffff 5%, transparent),
-      0 10px 30px -20px rgba(0, 0, 0, 0.7);
-    transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
-  }
-  .cert-card:hover {
-    transform: translateY(-2px);
-    box-shadow:
-      inset 0 1px 0 color-mix(in srgb, #ffffff 8%, transparent),
-      0 18px 40px -20px rgba(0, 0, 0, 0.8);
+    transition: border-color 0.3s ease;
   }
   .is-obtenida {
     border-left-color: var(--accent);
@@ -82,39 +70,14 @@ const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
     border-left-color: var(--line-strong);
   }
 
-  /* Barrido de luz (reflejo) al pasar el ratón */
-  .cert-sheen {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(
-      105deg,
-      transparent 42%,
-      color-mix(in srgb, #ffffff 8%, transparent) 50%,
-      transparent 58%
-    );
-    transform: translateX(-130%);
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .cert-sheen {
-      transition: transform 0.75s ease;
-    }
-    .cert-card:hover .cert-sheen {
-      transform: translateX(130%);
-    }
-  }
-
-  /* Emblema hexagonal tipo badge */
+  /* Emblema hexagonal; se inclina un poco siguiendo al ratón (--brx/--bry). */
   .cert-badge {
-    position: relative;
     width: 92px;
     height: 100px;
     flex: none;
-    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4));
-    transition: transform 0.35s ease;
-  }
-  .cert-card:hover .cert-badge {
-    transform: translateY(-3px) rotate(-2deg);
+    filter: drop-shadow(0 7px 14px rgba(0, 0, 0, 0.4));
+    transform: perspective(520px) rotateX(var(--brx, 0deg)) rotateY(var(--bry, 0deg));
+    transition: transform 0.18s ease;
   }
   .cert-badge-face {
     position: absolute;
@@ -131,36 +94,17 @@ const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
     );
     border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line-strong));
   }
-  /* Brillo holográfico giratorio */
-  .cert-badge-face::before {
-    content: '';
-    position: absolute;
-    inset: -35%;
-    background: conic-gradient(
-      from 0deg,
-      transparent,
-      color-mix(in srgb, var(--accent) 50%, transparent),
-      transparent,
-      color-mix(in srgb, #ffffff 35%, transparent),
-      transparent 72%
-    );
-    mix-blend-mode: screen;
-    opacity: 0.55;
-    transition: transform 0.9s ease;
-  }
-  .cert-card:hover .cert-badge-face::before {
-    transform: rotate(150deg);
-  }
-  /* Reflejo especular (la parte "3D" de cristal) */
+  /* Reflejo especular fijo (el "cristal") */
   .cert-badge-face::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(160deg, color-mix(in srgb, #ffffff 20%, transparent), transparent 42%);
+    background: linear-gradient(160deg, color-mix(in srgb, #ffffff 22%, transparent), transparent 42%);
+    pointer-events: none;
   }
   .cert-badge-code {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     font-family: var(--font-display);
     font-weight: 700;
     letter-spacing: -0.02em;
@@ -168,21 +112,59 @@ const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   }
 
-  /* Estado "próximamente": emblema apagado, como bloqueado */
+  /* Foil holográfico: todo el espectro de color, se desplaza con el ratón. */
+  .cert-holo {
+    position: absolute;
+    inset: -25%;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.14;
+    transition: opacity 0.35s ease;
+    /* Espectro completo centrado en el ratón (--mx/--my). Mezcla normal para
+       que se vea tanto en claro como en oscuro. */
+    background: conic-gradient(
+      from 120deg at var(--mx, 50%) var(--my, 50%),
+      #ff5f6d,
+      #ffc371,
+      #f9ff6a,
+      #78ffb0,
+      #6ae6ff,
+      #9b8bff,
+      #ff7be6,
+      #ff5f6d
+    );
+  }
+  /* Glint blanco que sigue al ratón, para el toque "aceitoso" */
+  .cert-holo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      55% 45% at var(--mx, 50%) var(--my, 50%),
+      color-mix(in srgb, #ffffff 45%, transparent),
+      transparent 55%
+    );
+    mix-blend-mode: screen;
+  }
+  /* El foil solo en la obtenida; se intensifica al acercar el ratón. */
+  .is-obtenida:hover .cert-holo {
+    opacity: 0.58;
+  }
+
+  /* "Próximamente": emblema apagado, como bloqueado (sin foil). */
   .is-planificada .cert-badge-face {
     background: linear-gradient(150deg, var(--surface-raised), var(--surface));
     border-color: var(--line-strong);
-  }
-  .is-planificada .cert-badge-face::before {
-    background: conic-gradient(from 0deg, transparent, color-mix(in srgb, #ffffff 22%, transparent), transparent 60%);
-    opacity: 0.4;
   }
   .is-planificada .cert-badge-code {
     color: var(--text-faint);
   }
   .is-planificada .cert-badge {
-    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.3)) saturate(0.6);
+    filter: drop-shadow(0 7px 14px rgba(0, 0, 0, 0.3)) saturate(0.6);
     opacity: 0.9;
+  }
+  .is-planificada .cert-holo {
+    display: none;
   }
 
   /* Píldora de estado */
@@ -223,3 +205,32 @@ const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
     }
   }
 </style>
+
+<script>
+  const cards = document.querySelectorAll<HTMLElement>('[data-cert-card]');
+  const fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MAX = 9; // grados de inclinación de la badge
+
+  cards.forEach((card) => {
+    const badge = card.querySelector<HTMLElement>('.cert-badge');
+    if (!badge) return;
+    card.addEventListener('pointermove', (e) => {
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width;
+      const py = (e.clientY - r.top) / r.height;
+      // El foil se desplaza con el ratón (siempre).
+      badge.style.setProperty('--mx', `${(px * 100).toFixed(1)}%`);
+      badge.style.setProperty('--my', `${(py * 100).toFixed(1)}%`);
+      // El tilt solo con ratón fino y sin reduced-motion.
+      if (fine && !reduce) {
+        badge.style.setProperty('--bry', `${((px - 0.5) * 2 * MAX).toFixed(2)}deg`);
+        badge.style.setProperty('--brx', `${(-(py - 0.5) * 2 * MAX).toFixed(2)}deg`);
+      }
+    });
+    card.addEventListener('pointerleave', () => {
+      badge.style.setProperty('--brx', '0deg');
+      badge.style.setProperty('--bry', '0deg');
+    });
+  });
+</script>
