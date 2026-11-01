@@ -128,7 +128,7 @@ const ui = {
     'cert.verify': 'verificar credencial',
     'cert.status.obtenida': 'obtenida',
     'cert.status.en-curso': 'en curso',
-    'cert.status.planificada': 'planificada',
+    'cert.status.planificada': 'próximamente',
 
     'copy.label': 'copiar',
     'copy.done': 'copiado',
@@ -215,7 +215,7 @@ const ui = {
     'cert.verify': 'verify credential',
     'cert.status.obtenida': 'achieved',
     'cert.status.en-curso': 'in progress',
-    'cert.status.planificada': 'planned',
+    'cert.status.planificada': 'upcoming',
 
     'copy.label': 'copy',
     'copy.done': 'copied',

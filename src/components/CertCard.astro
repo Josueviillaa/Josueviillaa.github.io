@@ -1,5 +1,5 @@
 ---
-import type { Cert, CertStatus } from '../data/certs';
+import type { Cert } from '../data/certs';
 import Icon from './Icon.astro';
 import { getLang, useT } from '../i18n';
 
@@ -11,69 +11,215 @@ const { cert } = Astro.props;
 const lang = getLang(Astro.url);
 const t = useT(lang);
 
-// Colores por estado; la etiqueta visible se traduce.
-const styles: Record<CertStatus, { cls: string; edge: string }> = {
-  obtenida: { cls: 'border-accent/40 bg-accent-soft text-accent', edge: 'border-l-accent' },
-  'en-curso': { cls: 'border-warn/40 bg-warn-soft text-warn', edge: 'border-l-warn' },
-  planificada: { cls: 'border-line-strong text-muted', edge: 'border-l-line-strong' },
-};
-const s = styles[cert.status];
 const statusLabel = t(`cert.status.${cert.status}` as 'cert.status.obtenida');
+// El código largo (eCPPT) necesita algo menos de tamaño en el emblema.
+const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
 ---
 
-<article class:list={['rounded-r-lg border border-l-2 border-line bg-surface p-6 sm:p-7', s.edge]}>
-  <div class="flex items-start justify-between gap-4">
-    <div class="min-w-0">
-      <h3 class="text-3xl font-bold">{cert.code}</h3>
-      <p class="mt-1.5 text-sm text-muted">{cert.name}</p>
-      <p class="mt-0.5 font-mono text-xs text-faint">{cert.issuer}{cert.date && ` · ${cert.date}`}</p>
-    </div>
-    <span
-      class:list={[
-        'shrink-0 rounded-sm border px-2 py-0.5 font-mono text-[0.6875rem] font-medium tracking-[0.08em] uppercase',
-        s.cls,
-      ]}
-    >
-      {statusLabel}
+<article class:list={['cert-card', `is-${cert.status}`]}>
+  <span class="cert-sheen" aria-hidden="true"></span>
+
+  <div class="cert-badge" aria-hidden="true">
+    <span class="cert-badge-face">
+      <span class:list={['cert-badge-code', codeSize]}>{cert.code}</span>
     </span>
   </div>
 
-  {
-    cert.flags && (
-      <div class="mt-6">
-        <div class="flex items-baseline justify-between font-mono text-xs">
-          <span class="text-faint">{t('cert.flags')}</span>
-          <span class="text-text">
-            {cert.flags.captured}/{cert.flags.total}
-          </span>
-        </div>
-        <div
-          class="mt-2 flex gap-1"
-          role="img"
-          aria-label={`${cert.flags.captured} ${t('cert.of')} ${cert.flags.total} ${t('cert.flags_word')}`}
+  <div class="min-w-0 flex-1">
+    <div class="flex items-start justify-between gap-3">
+      <h3 class="text-base leading-snug font-semibold text-text sm:text-lg">{cert.name}</h3>
+      <span class="cert-pill">{statusLabel}</span>
+    </div>
+    <p class="mt-1.5 font-mono text-xs text-faint">{cert.issuer}{cert.date && ` · ${cert.date}`}</p>
+
+    {cert.note && <p class="mt-3 text-sm text-muted">{cert.note}</p>}
+
+    {
+      cert.verifyUrl && (
+        <a
+          href={cert.verifyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="link mt-4 inline-flex items-center gap-1.5 font-mono text-xs"
         >
-          {Array.from({ length: cert.flags.total }, (_, i) => (
-            <span class:list={['h-1.5 flex-1 rounded-[1px]', i < cert.flags!.captured ? 'bg-accent' : 'bg-line-strong']} />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  {
-    cert.note && <p class="mt-5 text-sm text-muted">{cert.note}</p>
-  }
-
-  {
-    cert.verifyUrl && (
-      <a
-        href={cert.verifyUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="link mt-5 inline-flex items-center gap-1.5 font-mono text-xs"
-      >
-        {t('cert.verify')} <Icon name="arrow-right" size={14} />
-      </a>
-    )
-  }
+          {t('cert.verify')} <Icon name="arrow-right" size={14} />
+        </a>
+      )
+    }
+  </div>
 </article>
+
+<style>
+  .cert-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-left-width: 2px;
+    border-radius: 0 0.7rem 0.7rem 0;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--text) 3%, var(--surface)), var(--surface));
+    padding: 1.4rem 1.5rem;
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #ffffff 5%, transparent),
+      0 10px 30px -20px rgba(0, 0, 0, 0.7);
+    transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
+  }
+  .cert-card:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #ffffff 8%, transparent),
+      0 18px 40px -20px rgba(0, 0, 0, 0.8);
+  }
+  .is-obtenida {
+    border-left-color: var(--accent);
+  }
+  .is-en-curso {
+    border-left-color: var(--warn);
+  }
+  .is-planificada {
+    border-left-color: var(--line-strong);
+  }
+
+  /* Barrido de luz (reflejo) al pasar el ratón */
+  .cert-sheen {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      105deg,
+      transparent 42%,
+      color-mix(in srgb, #ffffff 8%, transparent) 50%,
+      transparent 58%
+    );
+    transform: translateX(-130%);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .cert-sheen {
+      transition: transform 0.75s ease;
+    }
+    .cert-card:hover .cert-sheen {
+      transform: translateX(130%);
+    }
+  }
+
+  /* Emblema hexagonal tipo badge */
+  .cert-badge {
+    position: relative;
+    width: 92px;
+    height: 100px;
+    flex: none;
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4));
+    transition: transform 0.35s ease;
+  }
+  .cert-card:hover .cert-badge {
+    transform: translateY(-3px) rotate(-2deg);
+  }
+  .cert-badge-face {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    overflow: hidden;
+    background: linear-gradient(
+      150deg,
+      color-mix(in srgb, var(--accent) 24%, var(--surface-raised)) 0%,
+      var(--surface) 55%,
+      color-mix(in srgb, var(--accent) 12%, var(--surface)) 100%
+    );
+    border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line-strong));
+  }
+  /* Brillo holográfico giratorio */
+  .cert-badge-face::before {
+    content: '';
+    position: absolute;
+    inset: -35%;
+    background: conic-gradient(
+      from 0deg,
+      transparent,
+      color-mix(in srgb, var(--accent) 50%, transparent),
+      transparent,
+      color-mix(in srgb, #ffffff 35%, transparent),
+      transparent 72%
+    );
+    mix-blend-mode: screen;
+    opacity: 0.55;
+    transition: transform 0.9s ease;
+  }
+  .cert-card:hover .cert-badge-face::before {
+    transform: rotate(150deg);
+  }
+  /* Reflejo especular (la parte "3D" de cristal) */
+  .cert-badge-face::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, color-mix(in srgb, #ffffff 20%, transparent), transparent 42%);
+  }
+  .cert-badge-code {
+    position: relative;
+    z-index: 1;
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  }
+
+  /* Estado "próximamente": emblema apagado, como bloqueado */
+  .is-planificada .cert-badge-face {
+    background: linear-gradient(150deg, var(--surface-raised), var(--surface));
+    border-color: var(--line-strong);
+  }
+  .is-planificada .cert-badge-face::before {
+    background: conic-gradient(from 0deg, transparent, color-mix(in srgb, #ffffff 22%, transparent), transparent 60%);
+    opacity: 0.4;
+  }
+  .is-planificada .cert-badge-code {
+    color: var(--text-faint);
+  }
+  .is-planificada .cert-badge {
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.3)) saturate(0.6);
+    opacity: 0.9;
+  }
+
+  /* Píldora de estado */
+  .cert-pill {
+    flex: none;
+    border: 1px solid;
+    border-radius: 4px;
+    padding: 0.1rem 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .is-obtenida .cert-pill {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    background: var(--accent-soft);
+  }
+  .is-en-curso .cert-pill {
+    color: var(--warn);
+    border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+    background: var(--warn-soft);
+  }
+  .is-planificada .cert-pill {
+    color: var(--text-faint);
+    border-color: var(--line-strong);
+  }
+
+  @media (max-width: 400px) {
+    .cert-card {
+      gap: 1rem;
+      padding: 1.25rem;
+    }
+    .cert-badge {
+      width: 76px;
+      height: 84px;
+    }
+  }
+</style>
