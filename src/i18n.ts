@@ -86,7 +86,7 @@ const ui = {
 
     'skills.kicker': 'skills',
     'skills.title': 'Skills y stack',
-    'skills.intro': 'Áreas y herramientas con las que trabajo en laboratorios y máquinas.',
+    'skills.intro': 'Las áreas, técnicas y herramientas con las que trabajo a diario en laboratorios y máquinas.',
 
     'certs.kicker': 'certs',
     'certs.title': 'Certificaciones',
@@ -117,7 +117,8 @@ const ui = {
     'contact.kicker': 'contacto',
     'contact.title': 'Hablemos',
     'contact.body':
-      'Si tienes un puesto, unas prácticas o un proyecto en el que encaje un perfil junior con método y ganas de aprender, escríbeme. Respondo por email o LinkedIn.',
+      'Si buscas un perfil ofensivo junior —metódico, autodidacta y con hambre de crecer— para un puesto, unas prácticas o un proyecto, hablemos. Respondo por email o LinkedIn.',
+    'contact.cta': 'Escríbeme',
 
     'card.read': 'leer writeup',
     'card.techniques': 'Técnicas',
@@ -173,7 +174,7 @@ const ui = {
 
     'skills.kicker': 'skills',
     'skills.title': 'Skills & stack',
-    'skills.intro': 'Areas and tools I work with across labs and machines.',
+    'skills.intro': 'The areas, techniques and tools I work with day to day across labs and machines.',
 
     'certs.kicker': 'certs',
     'certs.title': 'Certifications',
@@ -204,7 +205,8 @@ const ui = {
     'contact.kicker': 'contact',
     'contact.title': "Let's talk",
     'contact.body':
-      'If you have a role, an internship or a project where a methodical junior keen to learn fits in, reach out. I reply by email or LinkedIn.',
+      "If you're looking for a junior offensive-security profile —methodical, self-taught and hungry to grow— for a role, an internship or a project, let's talk. I reply by email or LinkedIn.",
+    'contact.cta': 'Get in touch',
 
     'card.read': 'read writeup',
     'card.techniques': 'Techniques',

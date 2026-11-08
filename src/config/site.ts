@@ -58,8 +58,9 @@ export const content: Record<Lang, LocaleContent> = {
     description:
       'Josué — pentester junior con Máster en Ciberseguridad & IA. Seguridad ofensiva en aplicaciones web y Active Directory: writeups de HackTheBox, certificaciones y notas técnicas.',
     about: [
-      'Pentester junior con Máster en Ciberseguridad & IA, especializado en seguridad ofensiva: aplicaciones web y Active Directory. Documento cada máquina que resuelvo —enumeración, vector de entrada, escalada y la lección de cada fase.',
-      'Busco incorporarme a un equipo de seguridad ofensiva, preferiblemente en remoto. Metódico, autodidacta y acostumbrado a trabajar en equipo.',
+      'Soy pentester junior con Máster en Ciberseguridad & IA. Me muevo en seguridad ofensiva —aplicaciones web y Active Directory— y aprendo rompiendo sistemas en entornos controlados para entender cómo se defienden.',
+      'Cada máquina que comprometo acaba en un writeup: enumeración, vector de entrada, escalada y la lección de cada fase. Escribir lo que hago me obliga a entenderlo de verdad, no solo a ejecutarlo.',
+      'Busco incorporarme a un equipo de seguridad ofensiva —red o purple team—, preferiblemente en remoto. Metódico, autodidacta y cómodo trabajando en equipo.',
     ],
     facts: [
       { label: 'Rol', value: 'Pentester junior' },
@@ -80,8 +81,9 @@ export const content: Record<Lang, LocaleContent> = {
     description:
       'Josué — junior pentester with an MSc in Cybersecurity & AI. Offensive security for web apps and Active Directory: HackTheBox write-ups, certifications and technical notes.',
     about: [
-      'Junior pentester with an MSc in Cybersecurity & AI, focused on offensive security: web applications and Active Directory. I document every machine I solve —enumeration, entry vector, privilege escalation and the lesson from each phase.',
-      'Looking to join an offensive-security team, ideally remote. Methodical, self-taught and used to working as part of a team.',
+      "I'm a junior pentester with an MSc in Cybersecurity & AI. I work in offensive security —web applications and Active Directory— and learn by breaking systems in controlled environments to understand how they're defended.",
+      'Every machine I compromise ends in a write-up: enumeration, entry vector, privilege escalation and the lesson from each phase. Writing down what I do forces me to truly understand it, not just run it.',
+      'I want to join an offensive-security team —red or purple team—, ideally remote. Methodical, self-taught and comfortable working as part of a team.',
     ],
     facts: [
       { label: 'Role', value: 'Junior pentester' },
