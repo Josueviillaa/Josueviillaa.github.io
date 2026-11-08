@@ -12,15 +12,62 @@ const lang = getLang(Astro.url);
 const t = useT(lang);
 
 const statusLabel = t(`cert.status.${cert.status}` as 'cert.status.obtenida');
-const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
+// Tamaño del código grabado dentro del emblema, según longitud.
+const codeFont = cert.code.length >= 5 ? 20 : 26;
+const codeY = (118 + codeFont * 0.34).toFixed(1);
 ---
 
 <article class:list={['cert-card', `is-${cert.status}`]} data-cert-card>
-  <div class="cert-badge" aria-hidden="true">
-    <span class="cert-badge-face">
-      <span class="cert-sheen"></span>
-      <span class:list={['cert-badge-code', codeSize]}>{cert.code}</span>
-    </span>
+  <div class="cert-badge" data-cert-badge aria-hidden="true">
+    <svg class="cert-medal" viewBox="20 30 180 192" xmlns="http://www.w3.org/2000/svg">
+      <!-- Caras del hexágono (luz desde arriba-izquierda) -->
+      <polygon class="facet" points="110,118 20,82 110,30" fill="#74838f"></polygon>
+      <polygon class="facet" points="110,118 110,30 200,82" fill="#64737f"></polygon>
+      <polygon class="facet" points="110,118 200,82 192,196" fill="#3f4a55"></polygon>
+      <polygon class="facet" points="110,118 192,196 110,222" fill="#2b333c"></polygon>
+      <polygon class="facet" points="110,118 110,222 28,196" fill="#262d35"></polygon>
+      <polygon class="facet" points="110,118 28,196 20,82" fill="#4c5a66"></polygon>
+
+      <!-- Aristas finas (cortes del metal) -->
+      <g stroke="#ffffff" stroke-width="0.5" opacity="0.1">
+        <line x1="110" y1="118" x2="110" y2="30"></line>
+        <line x1="110" y1="118" x2="200" y2="82"></line>
+        <line x1="110" y1="118" x2="192" y2="196"></line>
+        <line x1="110" y1="118" x2="110" y2="222"></line>
+        <line x1="110" y1="118" x2="28" y2="196"></line>
+        <line x1="110" y1="118" x2="20" y2="82"></line>
+      </g>
+
+      <!-- Contorno exterior biselado -->
+      <polygon
+        class="rim"
+        points="110,30 200,82 192,196 110,222 28,196 20,82"
+        fill="none"
+        stroke-width="2"></polygon>
+
+      <!-- Emblema central: moneda grabada con el código -->
+      <circle cx="110" cy="118" r="34" fill="#1b222a"></circle>
+      <circle cx="110" cy="118" r="34" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.08"></circle>
+      <circle class="rim" cx="110" cy="118" r="33" fill="none" stroke-width="1.1" opacity="0.7"></circle>
+      <text
+        x="110"
+        y={codeY}
+        text-anchor="middle"
+        fill="#05100d"
+        opacity="0.55"
+        style={`font-family:var(--font-display);font-weight:700;font-size:${codeFont}px;letter-spacing:-0.02em`}
+        transform="translate(0,1)">{cert.code}</text>
+      <text
+        class="code"
+        x="110"
+        y={codeY}
+        text-anchor="middle"
+        style={`font-family:var(--font-display);font-weight:700;font-size:${codeFont}px;letter-spacing:-0.02em`}
+        >{cert.code}</text>
+    </svg>
+
+    <!-- Reflejo que glisa con el ratón (suave, por encima del metal) -->
+    <span class="cert-shine"></span>
   </div>
 
   <div class="min-w-0 flex-1">
@@ -48,7 +95,19 @@ const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
 </article>
 
 <style>
-  /* Tarjeta: minimalista y estática. Todo el "efecto" vive en la badge. */
+  /* Posición del reflejo (0–100). Registrada para poder transicionarla:
+     el brillo "glisa" hacia el ratón en vez de saltar. */
+  @property --mx {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 50;
+  }
+  @property --my {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 38;
+  }
+
   .cert-card {
     display: flex;
     align-items: center;
@@ -70,104 +129,92 @@ const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
     border-left-color: var(--line-strong);
   }
 
-  /* Emblema hexagonal; se inclina un poco siguiendo al ratón (--brx/--bry). */
+  /* Emblema */
   .cert-badge {
-    width: 92px;
-    height: 100px;
-    flex: none;
-    filter: drop-shadow(0 7px 14px rgba(0, 0, 0, 0.4));
-    transform: perspective(520px) rotateX(var(--brx, 0deg)) rotateY(var(--bry, 0deg));
-    transition: transform 0.18s ease;
-  }
-  .cert-badge-face {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-    overflow: hidden;
-    /* Metal oscuro: degradado base de tres paradas, tono frío. */
-    background: linear-gradient(
-      150deg,
-      color-mix(in srgb, var(--accent) 9%, var(--surface-raised)) 0%,
-      var(--surface) 50%,
-      color-mix(in srgb, #000000 14%, var(--surface)) 100%
-    );
-    border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line-strong));
-  }
-  /* Micro-cepillado del metal (líneas finísimas). */
-  .cert-badge-face::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: repeating-linear-gradient(
-      118deg,
-      transparent 0 2px,
-      color-mix(in srgb, #ffffff 4%, transparent) 2px 3px
-    );
-    opacity: 0.5;
-    pointer-events: none;
-  }
-  /* Bisel especular fijo: borde superior iluminado, como una pieza biselada. */
-  .cert-badge-face::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(158deg, color-mix(in srgb, #ffffff 20%, transparent), transparent 40%);
-    pointer-events: none;
-  }
-  .cert-badge-code {
+    --mx: 50;
+    --my: 38;
+    --rim: var(--accent);
     position: relative;
-    z-index: 2;
-    font-family: var(--font-display);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: var(--text);
-    /* Grabado: sombra abajo + luz arriba. */
-    text-shadow:
-      0 1px 1px rgba(0, 0, 0, 0.55),
-      0 -1px 1px color-mix(in srgb, #ffffff 12%, transparent);
+    width: 96px;
+    height: 102px;
+    flex: none;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.45));
+    transition:
+      --mx 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+      --my 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.4s ease,
+      filter 0.4s ease;
+  }
+  .is-en-curso .cert-badge {
+    --rim: var(--warn);
+  }
+  .is-planificada .cert-badge {
+    --rim: var(--line-strong);
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3)) grayscale(0.5) brightness(0.82);
+    opacity: 0.82;
   }
 
-  /* Destello único: una luz blanca que recorre la badge siguiendo al ratón. */
-  .cert-sheen {
+  .cert-medal {
     position: absolute;
     inset: 0;
-    z-index: 1;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .rim {
+    stroke: var(--rim);
+    opacity: 0.55;
+  }
+  .code {
+    fill: #eaf2f0;
+  }
+  .is-planificada .code {
+    fill: #aeb8c0;
+  }
+
+  /* Reflejo: destello blanco suave centrado en (--mx,--my), recortado al hexágono.
+     'screen' lo hace leer como luz sobre metal; glisa gracias a @property. */
+  .cert-shine {
+    position: absolute;
+    inset: 0;
     pointer-events: none;
-    opacity: 0.22;
-    transition: opacity 0.4s ease;
+    clip-path: polygon(50% 0%, 100% 27.1%, 95.6% 86.5%, 50% 100%, 4.4% 86.5%, 0% 27.1%);
     background: radial-gradient(
-      60% 48% at var(--mx, 50%) var(--my, 50%),
-      color-mix(in srgb, #ffffff 40%, transparent),
-      transparent 60%
+      40% 36% at calc(var(--mx) * 1%) calc(var(--my) * 1%),
+      rgba(255, 255, 255, 0.5),
+      rgba(255, 255, 255, 0) 62%
+    );
+    mix-blend-mode: screen;
+    opacity: 0.55;
+    transition: opacity 0.4s ease;
+  }
+  /* Un segundo foco, más estrecho, da el "glint" especular. */
+  .cert-shine::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      16% 14% at calc(var(--mx) * 1%) calc(var(--my) * 1%),
+      rgba(255, 255, 255, 0.85),
+      rgba(255, 255, 255, 0) 60%
     );
     mix-blend-mode: screen;
   }
-  /* En la obtenida, el destello se intensifica al pasar el ratón. */
-  .is-obtenida:hover .cert-sheen {
-    opacity: 0.7;
-  }
-  /* Y la badge gana un halo cian muy sutil (acento único de la web). */
-  .is-obtenida:hover .cert-badge {
-    filter: drop-shadow(0 7px 14px rgba(0, 0, 0, 0.42))
-      drop-shadow(0 0 9px color-mix(in srgb, var(--accent) 38%, transparent));
+  .is-planificada .cert-shine {
+    opacity: 0.12;
   }
 
-  /* "Próximamente": emblema apagado, como bloqueado (sin destello). */
-  .is-planificada .cert-badge-face {
-    background: linear-gradient(150deg, var(--surface-raised), var(--surface));
-    border-color: var(--line-strong);
+  /* Al pasar el ratón: sube un pelo, el reflejo gana fuerza y aparece un halo del acento. */
+  .cert-card:hover .cert-badge {
+    transform: translateY(-2px);
   }
-  .is-planificada .cert-badge-code {
-    color: var(--text-faint);
+  .is-obtenida:hover .cert-badge,
+  .is-en-curso:hover .cert-badge {
+    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5))
+      drop-shadow(0 0 10px color-mix(in srgb, var(--rim) 42%, transparent));
   }
-  .is-planificada .cert-badge {
-    filter: drop-shadow(0 7px 14px rgba(0, 0, 0, 0.3));
-    opacity: 0.85;
-  }
-  .is-planificada .cert-sheen {
-    opacity: 0.06;
+  .cert-card:hover .cert-shine {
+    opacity: 0.9;
   }
 
   /* Píldora de estado */
@@ -197,43 +244,45 @@ const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
     border-color: var(--line-strong);
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .cert-badge {
+      transition: filter 0.3s ease;
+    }
+    .cert-card:hover .cert-badge {
+      transform: none;
+    }
+  }
+
   @media (max-width: 400px) {
     .cert-card {
       gap: 1rem;
       padding: 1.25rem;
     }
     .cert-badge {
-      width: 76px;
-      height: 84px;
+      width: 80px;
+      height: 85px;
     }
   }
 </style>
 
 <script>
-  const cards = document.querySelectorAll<HTMLElement>('[data-cert-card]');
-  const fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const badges = document.querySelectorAll<HTMLElement>('[data-cert-badge]');
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const MAX = 9; // grados de inclinación de la badge
 
-  cards.forEach((card) => {
-    const badge = card.querySelector<HTMLElement>('.cert-badge');
-    if (!badge) return;
+  badges.forEach((badge) => {
+    const card = badge.closest<HTMLElement>('[data-cert-card]');
+    if (!card || reduce) return;
+    // El reflejo sigue al ratón sobre TODA la tarjeta (zona cómoda), suavizado por CSS.
     card.addEventListener('pointermove', (e) => {
-      const r = card.getBoundingClientRect();
-      const px = (e.clientX - r.left) / r.width;
-      const py = (e.clientY - r.top) / r.height;
-      // El foil se desplaza con el ratón (siempre).
-      badge.style.setProperty('--mx', `${(px * 100).toFixed(1)}%`);
-      badge.style.setProperty('--my', `${(py * 100).toFixed(1)}%`);
-      // El tilt solo con ratón fino y sin reduced-motion.
-      if (fine && !reduce) {
-        badge.style.setProperty('--bry', `${((px - 0.5) * 2 * MAX).toFixed(2)}deg`);
-        badge.style.setProperty('--brx', `${(-(py - 0.5) * 2 * MAX).toFixed(2)}deg`);
-      }
+      const r = badge.getBoundingClientRect();
+      const mx = ((e.clientX - r.left) / r.width) * 100;
+      const my = ((e.clientY - r.top) / r.height) * 100;
+      badge.style.setProperty('--mx', Math.max(-20, Math.min(120, mx)).toFixed(1));
+      badge.style.setProperty('--my', Math.max(-20, Math.min(120, my)).toFixed(1));
     });
     card.addEventListener('pointerleave', () => {
-      badge.style.setProperty('--brx', '0deg');
-      badge.style.setProperty('--bry', '0deg');
+      badge.style.setProperty('--mx', '50');
+      badge.style.setProperty('--my', '38');
     });
   });
 </script>
