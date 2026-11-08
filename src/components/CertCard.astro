@@ -14,43 +14,44 @@ const t = useT(lang);
 const statusLabel = t(`cert.status.${cert.status}` as 'cert.status.obtenida');
 // Tamaño del código grabado dentro del emblema, según longitud.
 const codeFont = cert.code.length >= 5 ? 20 : 26;
-const codeY = (118 + codeFont * 0.34).toFixed(1);
+const codeY = (110 + codeFont * 0.34).toFixed(1);
 ---
 
 <article class:list={['cert-card', `is-${cert.status}`]} data-cert-card>
   <div class="cert-badge" data-cert-badge aria-hidden="true">
-    <svg class="cert-medal" viewBox="20 30 180 192" xmlns="http://www.w3.org/2000/svg">
-      <!-- Caras del hexágono (luz desde arriba-izquierda) -->
-      <polygon class="facet" points="110,118 20,82 110,30" fill="#74838f"></polygon>
-      <polygon class="facet" points="110,118 110,30 200,82" fill="#64737f"></polygon>
-      <polygon class="facet" points="110,118 200,82 192,196" fill="#3f4a55"></polygon>
-      <polygon class="facet" points="110,118 192,196 110,222" fill="#2b333c"></polygon>
-      <polygon class="facet" points="110,118 110,222 28,196" fill="#262d35"></polygon>
-      <polygon class="facet" points="110,118 28,196 20,82" fill="#4c5a66"></polygon>
+    <svg class="cert-medal" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
+      <!-- Caras del hexágono (lados verticales). Luz desde arriba-izquierda,
+           con bastante contraste entre caras para marcar el relieve. -->
+      <polygon class="facet" points="100,110 0,55 100,0" fill="#92a5b6"></polygon>
+      <polygon class="facet" points="100,110 100,0 200,55" fill="#6e8193"></polygon>
+      <polygon class="facet" points="100,110 200,55 200,165" fill="#3c4a59"></polygon>
+      <polygon class="facet" points="100,110 200,165 100,220" fill="#212b36"></polygon>
+      <polygon class="facet" points="100,110 100,220 0,165" fill="#19212b"></polygon>
+      <polygon class="facet" points="100,110 0,165 0,55" fill="#526375"></polygon>
 
       <!-- Aristas finas (cortes del metal) -->
-      <g stroke="#ffffff" stroke-width="0.5" opacity="0.1">
-        <line x1="110" y1="118" x2="110" y2="30"></line>
-        <line x1="110" y1="118" x2="200" y2="82"></line>
-        <line x1="110" y1="118" x2="192" y2="196"></line>
-        <line x1="110" y1="118" x2="110" y2="222"></line>
-        <line x1="110" y1="118" x2="28" y2="196"></line>
-        <line x1="110" y1="118" x2="20" y2="82"></line>
+      <g stroke="#ffffff" stroke-width="0.6" opacity="0.12">
+        <line x1="100" y1="110" x2="100" y2="0"></line>
+        <line x1="100" y1="110" x2="200" y2="55"></line>
+        <line x1="100" y1="110" x2="200" y2="165"></line>
+        <line x1="100" y1="110" x2="100" y2="220"></line>
+        <line x1="100" y1="110" x2="0" y2="165"></line>
+        <line x1="100" y1="110" x2="0" y2="55"></line>
       </g>
 
       <!-- Contorno exterior biselado -->
       <polygon
         class="rim"
-        points="110,30 200,82 192,196 110,222 28,196 20,82"
+        points="100,0 200,55 200,165 100,220 0,165 0,55"
         fill="none"
         stroke-width="2"></polygon>
 
       <!-- Emblema central: moneda grabada con el código -->
-      <circle cx="110" cy="118" r="34" fill="#1b222a"></circle>
-      <circle cx="110" cy="118" r="34" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.08"></circle>
-      <circle class="rim" cx="110" cy="118" r="33" fill="none" stroke-width="1.1" opacity="0.7"></circle>
+      <circle cx="100" cy="110" r="34" fill="#141c25"></circle>
+      <circle cx="100" cy="110" r="34" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.08"></circle>
+      <circle class="rim" cx="100" cy="110" r="33" fill="none" stroke-width="1.1" opacity="0.7"></circle>
       <text
-        x="110"
+        x="100"
         y={codeY}
         text-anchor="middle"
         fill="#05100d"
@@ -59,14 +60,14 @@ const codeY = (118 + codeFont * 0.34).toFixed(1);
         transform="translate(0,1)">{cert.code}</text>
       <text
         class="code"
-        x="110"
+        x="100"
         y={codeY}
         text-anchor="middle"
         style={`font-family:var(--font-display);font-weight:700;font-size:${codeFont}px;letter-spacing:-0.02em`}
         >{cert.code}</text>
     </svg>
 
-    <!-- Reflejo que glisa con el ratón (suave, por encima del metal) -->
+    <!-- Reflejo que glisa con el ratón (sutil, por encima del metal) -->
     <span class="cert-shine"></span>
   </div>
 
@@ -105,7 +106,7 @@ const codeY = (118 + codeFont * 0.34).toFixed(1);
   @property --my {
     syntax: '<number>';
     inherits: true;
-    initial-value: 38;
+    initial-value: 34;
   }
 
   .cert-card {
@@ -132,16 +133,16 @@ const codeY = (118 + codeFont * 0.34).toFixed(1);
   /* Emblema */
   .cert-badge {
     --mx: 50;
-    --my: 38;
+    --my: 34;
     --rim: var(--accent);
     position: relative;
-    width: 96px;
-    height: 102px;
+    width: 92px;
+    height: 101px;
     flex: none;
     filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.45));
     transition:
-      --mx 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-      --my 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+      --mx 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      --my 0.45s cubic-bezier(0.22, 1, 0.36, 1),
       transform 0.4s ease,
       filter 0.4s ease;
   }
@@ -150,7 +151,7 @@ const codeY = (118 + codeFont * 0.34).toFixed(1);
   }
   .is-planificada .cert-badge {
     --rim: var(--line-strong);
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3)) grayscale(0.5) brightness(0.82);
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3)) grayscale(0.55) brightness(0.8);
     opacity: 0.82;
   }
 
@@ -172,30 +173,31 @@ const codeY = (118 + codeFont * 0.34).toFixed(1);
     fill: #aeb8c0;
   }
 
-  /* Reflejo: destello blanco suave centrado en (--mx,--my), recortado al hexágono.
-     'screen' lo hace leer como luz sobre metal; glisa gracias a @property. */
+  /* Reflejo: destello suave centrado en (--mx,--my), recortado al hexágono.
+     'screen' lo hace leer como luz sobre metal; glisa gracias a @property.
+     Intensidad contenida para un acabado sobrio. */
   .cert-shine {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    clip-path: polygon(50% 0%, 100% 27.1%, 95.6% 86.5%, 50% 100%, 4.4% 86.5%, 0% 27.1%);
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
     background: radial-gradient(
-      40% 36% at calc(var(--mx) * 1%) calc(var(--my) * 1%),
-      rgba(255, 255, 255, 0.5),
-      rgba(255, 255, 255, 0) 62%
+      42% 38% at calc(var(--mx) * 1%) calc(var(--my) * 1%),
+      rgba(255, 255, 255, 0.32),
+      rgba(255, 255, 255, 0) 64%
     );
     mix-blend-mode: screen;
-    opacity: 0.55;
+    opacity: 0.85;
     transition: opacity 0.4s ease;
   }
-  /* Un segundo foco, más estrecho, da el "glint" especular. */
+  /* Un segundo foco, más estrecho, da el "glint" especular (también sutil). */
   .cert-shine::after {
     content: '';
     position: absolute;
     inset: 0;
     background: radial-gradient(
-      16% 14% at calc(var(--mx) * 1%) calc(var(--my) * 1%),
-      rgba(255, 255, 255, 0.85),
+      14% 12% at calc(var(--mx) * 1%) calc(var(--my) * 1%),
+      rgba(255, 255, 255, 0.6),
       rgba(255, 255, 255, 0) 60%
     );
     mix-blend-mode: screen;
@@ -204,17 +206,17 @@ const codeY = (118 + codeFont * 0.34).toFixed(1);
     opacity: 0.12;
   }
 
-  /* Al pasar el ratón: sube un pelo, el reflejo gana fuerza y aparece un halo del acento. */
+  /* Al pasar el ratón: sube un pelo, el reflejo gana algo de fuerza y aparece un halo del acento. */
   .cert-card:hover .cert-badge {
     transform: translateY(-2px);
   }
   .is-obtenida:hover .cert-badge,
   .is-en-curso:hover .cert-badge {
     filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5))
-      drop-shadow(0 0 10px color-mix(in srgb, var(--rim) 42%, transparent));
+      drop-shadow(0 0 10px color-mix(in srgb, var(--rim) 38%, transparent));
   }
   .cert-card:hover .cert-shine {
-    opacity: 0.9;
+    opacity: 1;
   }
 
   /* Píldora de estado */
@@ -259,8 +261,8 @@ const codeY = (118 + codeFont * 0.34).toFixed(1);
       padding: 1.25rem;
     }
     .cert-badge {
-      width: 80px;
-      height: 85px;
+      width: 78px;
+      height: 86px;
     }
   }
 </style>
@@ -282,7 +284,7 @@ const codeY = (118 + codeFont * 0.34).toFixed(1);
     });
     card.addEventListener('pointerleave', () => {
       badge.style.setProperty('--mx', '50');
-      badge.style.setProperty('--my', '38');
+      badge.style.setProperty('--my', '34');
     });
   });
 </script>
