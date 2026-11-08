@@ -18,7 +18,7 @@ const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
 <article class:list={['cert-card', `is-${cert.status}`]} data-cert-card>
   <div class="cert-badge" aria-hidden="true">
     <span class="cert-badge-face">
-      <span class="cert-holo"></span>
+      <span class="cert-sheen"></span>
       <span class:list={['cert-badge-code', codeSize]}>{cert.code}</span>
     </span>
   </div>
@@ -86,20 +86,34 @@ const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
     place-items: center;
     clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
     overflow: hidden;
+    /* Metal oscuro: degradado base de tres paradas, tono frío. */
     background: linear-gradient(
       150deg,
-      color-mix(in srgb, var(--accent) 24%, var(--surface-raised)) 0%,
-      var(--surface) 55%,
-      color-mix(in srgb, var(--accent) 12%, var(--surface)) 100%
+      color-mix(in srgb, var(--accent) 9%, var(--surface-raised)) 0%,
+      var(--surface) 50%,
+      color-mix(in srgb, #000000 14%, var(--surface)) 100%
     );
-    border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line-strong));
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line-strong));
   }
-  /* Reflejo especular fijo (el "cristal") */
+  /* Micro-cepillado del metal (líneas finísimas). */
+  .cert-badge-face::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      118deg,
+      transparent 0 2px,
+      color-mix(in srgb, #ffffff 4%, transparent) 2px 3px
+    );
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  /* Bisel especular fijo: borde superior iluminado, como una pieza biselada. */
   .cert-badge-face::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(160deg, color-mix(in srgb, #ffffff 22%, transparent), transparent 42%);
+    background: linear-gradient(158deg, color-mix(in srgb, #ffffff 20%, transparent), transparent 40%);
     pointer-events: none;
   }
   .cert-badge-code {
@@ -109,49 +123,38 @@ const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--text);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+    /* Grabado: sombra abajo + luz arriba. */
+    text-shadow:
+      0 1px 1px rgba(0, 0, 0, 0.55),
+      0 -1px 1px color-mix(in srgb, #ffffff 12%, transparent);
   }
 
-  /* Foil holográfico: todo el espectro de color, se desplaza con el ratón. */
-  .cert-holo {
-    position: absolute;
-    inset: -25%;
-    z-index: 1;
-    pointer-events: none;
-    opacity: 0.14;
-    transition: opacity 0.35s ease;
-    /* Espectro completo centrado en el ratón (--mx/--my). Mezcla normal para
-       que se vea tanto en claro como en oscuro. */
-    background: conic-gradient(
-      from 120deg at var(--mx, 50%) var(--my, 50%),
-      #ff5f6d,
-      #ffc371,
-      #f9ff6a,
-      #78ffb0,
-      #6ae6ff,
-      #9b8bff,
-      #ff7be6,
-      #ff5f6d
-    );
-  }
-  /* Glint blanco que sigue al ratón, para el toque "aceitoso" */
-  .cert-holo::after {
-    content: '';
+  /* Destello único: una luz blanca que recorre la badge siguiendo al ratón. */
+  .cert-sheen {
     position: absolute;
     inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.22;
+    transition: opacity 0.4s ease;
     background: radial-gradient(
-      55% 45% at var(--mx, 50%) var(--my, 50%),
-      color-mix(in srgb, #ffffff 45%, transparent),
-      transparent 55%
+      60% 48% at var(--mx, 50%) var(--my, 50%),
+      color-mix(in srgb, #ffffff 40%, transparent),
+      transparent 60%
     );
     mix-blend-mode: screen;
   }
-  /* El foil solo en la obtenida; se intensifica al acercar el ratón. */
-  .is-obtenida:hover .cert-holo {
-    opacity: 0.58;
+  /* En la obtenida, el destello se intensifica al pasar el ratón. */
+  .is-obtenida:hover .cert-sheen {
+    opacity: 0.7;
+  }
+  /* Y la badge gana un halo cian muy sutil (acento único de la web). */
+  .is-obtenida:hover .cert-badge {
+    filter: drop-shadow(0 7px 14px rgba(0, 0, 0, 0.42))
+      drop-shadow(0 0 9px color-mix(in srgb, var(--accent) 38%, transparent));
   }
 
-  /* "Próximamente": emblema apagado, como bloqueado (sin foil). */
+  /* "Próximamente": emblema apagado, como bloqueado (sin destello). */
   .is-planificada .cert-badge-face {
     background: linear-gradient(150deg, var(--surface-raised), var(--surface));
     border-color: var(--line-strong);
@@ -160,11 +163,11 @@ const codeSize = cert.code.length >= 5 ? 'text-[0.9rem]' : 'text-[1.1rem]';
     color: var(--text-faint);
   }
   .is-planificada .cert-badge {
-    filter: drop-shadow(0 7px 14px rgba(0, 0, 0, 0.3)) saturate(0.6);
-    opacity: 0.9;
+    filter: drop-shadow(0 7px 14px rgba(0, 0, 0, 0.3));
+    opacity: 0.85;
   }
-  .is-planificada .cert-holo {
-    display: none;
+  .is-planificada .cert-sheen {
+    opacity: 0.06;
   }
 
   /* Píldora de estado */
