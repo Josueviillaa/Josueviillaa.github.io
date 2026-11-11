@@ -179,16 +179,16 @@ const gid = `m-${cert.code}`;
     pointer-events: none;
     clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
     background: radial-gradient(
-      46% 40% at calc(var(--mx) * 1%) calc(var(--my) * 1%),
-      rgba(255, 255, 255, 0.22),
-      rgba(255, 255, 255, 0) 66%
+      75% 65% at calc(var(--mx) * 1%) calc(var(--my) * 1%),
+      rgba(255, 255, 255, 0.11),
+      rgba(255, 255, 255, 0) 72%
     );
     mix-blend-mode: screen;
-    opacity: 0.9;
+    opacity: 0.8;
     transition: opacity 0.4s ease;
   }
   .is-planificada .cert-shine {
-    opacity: 0.1;
+    opacity: 0.08;
   }
 
   /* Hover: sube un pelo y aparece un halo muy tenue del acento. */
@@ -201,7 +201,7 @@ const gid = `m-${cert.code}`;
       drop-shadow(0 0 8px color-mix(in srgb, var(--rim) 30%, transparent));
   }
   .cert-card:hover .cert-shine {
-    opacity: 1;
+    opacity: 0.92;
   }
 
   /* Píldora de estado */
