@@ -161,5 +161,31 @@ const personLd = {
     </footer>
 
     <PrivacyNotice />
+
+    <!-- Glosario: en táctil, tocar un término muestra/oculta su definición;
+         Escape o un toque fuera lo cierran. En ratón/teclado basta hover/foco. -->
+    <script is:inline>
+      (function () {
+        function closeAll(except) {
+          document.querySelectorAll('abbr.gl.is-open').forEach(function (el) {
+            if (el !== except) el.classList.remove('is-open');
+          });
+        }
+        document.addEventListener('click', function (e) {
+          var el = e.target instanceof Element ? e.target.closest('abbr.gl') : null;
+          if (el) {
+            e.preventDefault();
+            var open = el.classList.contains('is-open');
+            closeAll(el);
+            el.classList.toggle('is-open', !open);
+          } else {
+            closeAll(null);
+          }
+        });
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') closeAll(null);
+        });
+      })();
+    </script>
   </body>
 </html>

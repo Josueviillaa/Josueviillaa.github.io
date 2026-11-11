@@ -3,6 +3,7 @@ import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
+import rehypeGlossary from './src/lib/rehype-glossary.mjs';
 
 // SITE_URL y BASE_PATH los inyecta el workflow de GitHub Pages
 // (.github/workflows/deploy.yml). En local no hace falta tocarlos.
@@ -23,6 +24,9 @@ export default defineConfig({
     }),
   ],
   markdown: {
+    // Glosario: convierte términos conocidos en tooltips (writeups y notas).
+    // Los .mdx heredan esta config de markdown por defecto.
+    rehypePlugins: [rehypeGlossary],
     shikiConfig: {
       // Colores de sintaxis para ambos temas; el fondo lo ponen nuestros tokens.
       themes: { light: 'github-light', dark: 'github-dark' },
