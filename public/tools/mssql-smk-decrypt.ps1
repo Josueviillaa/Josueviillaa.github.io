@@ -33,6 +33,15 @@
     Autor : Josué (https://josueviillaa.github.io)
     Requisitos: ejecutar en el host de SQL Server, PowerShell con
     privilegios suficientes para abrir la DAC y leer la clave del registro.
+
+.DISCLAIMER
+    Software educativo y de investigación en seguridad, entregado «TAL CUAL»,
+    SIN GARANTÍA de ningún tipo. Úsalo ÚNICAMENTE sobre sistemas de tu
+    propiedad o con autorización expresa y por escrito. Su uso es
+    responsabilidad exclusiva de quien lo ejecuta; el autor no se
+    responsabiliza del uso indebido ni de los daños que puedan derivarse.
+    El acceso no autorizado a sistemas informáticos es un delito.
+    Licencia MIT — ver el fichero LICENSE del repositorio.
 #>
 
 [CmdletBinding()]

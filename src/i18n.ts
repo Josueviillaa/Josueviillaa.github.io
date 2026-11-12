@@ -124,6 +124,9 @@ const ui = {
     'tools.count_many': 'herramientas',
     'tools.footer':
       'Herramienta con fines educativos y de investigación. Úsala únicamente sobre sistemas propios o con autorización explícita.',
+    'tools.disclaimer.title': 'Aviso legal',
+    'tools.disclaimer.body':
+      'Las herramientas de esta sección se publican con fines educativos y de investigación en seguridad. Se ofrecen «tal cual», sin garantía de ningún tipo. Úsalas únicamente sobre sistemas de tu propiedad o con autorización expresa y por escrito; su uso es responsabilidad exclusiva de quien las ejecuta. El autor no se responsabiliza del uso indebido ni de los daños que puedan derivarse. El acceso no autorizado a sistemas informáticos es un delito.',
     'tool.read': 'ver',
     'tool.download': 'Descargar',
     'tool.github': 'Ver en GitHub',
@@ -231,6 +234,9 @@ const ui = {
     'tools.count_many': 'tools',
     'tools.footer':
       'Tool for educational and research purposes. Use it only against your own systems or with explicit authorization.',
+    'tools.disclaimer.title': 'Legal notice',
+    'tools.disclaimer.body':
+      'The tools in this section are published for educational and security-research purposes. They are provided “as is”, without warranty of any kind. Use them only against systems you own or are explicitly authorized in writing to test; using them is solely your responsibility. The author accepts no liability for misuse or any resulting damage. Unauthorized access to computer systems is a crime.',
     'tool.read': 'view',
     'tool.download': 'Download',
     'tool.github': 'View on GitHub',

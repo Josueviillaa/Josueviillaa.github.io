@@ -1,0 +1,16 @@
+---
+// Aviso legal reutilizable para la sección de herramientas.
+import { getLang, useT } from '../i18n';
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+---
+
+<aside class="rounded-lg border border-warn/30 bg-warn-soft p-4 sm:p-5">
+  <p class="flex items-center gap-2 font-mono text-xs font-medium tracking-wide text-warn uppercase">
+    <span aria-hidden="true">⚠</span> {t('tools.disclaimer.title')}
+  </p>
+  <p class="mt-2 max-w-3xl text-[0.8125rem] leading-relaxed text-muted">
+    {t('tools.disclaimer.body')}
+  </p>
+</aside>

@@ -1,5 +1,6 @@
 ---
 import ToolCard from './ToolCard.astro';
+import ToolDisclaimer from './ToolDisclaimer.astro';
 import Icon from './Icon.astro';
 import { getTools } from '../lib/tools';
 import { getLang, homeHref, useT } from '../i18n';
@@ -34,6 +35,10 @@ const countWord = tools.length === 1 ? t('tools.count_one') : t('tools.count_man
     <h1 class="text-4xl font-bold sm:text-5xl">{t('tools.title')}</h1>
     <p class="max-w-2xl text-muted">{t('tools.intro')}</p>
   </header>
+
+  <div class="mt-8">
+    <ToolDisclaimer />
+  </div>
 
   {
     tools.length ? (
