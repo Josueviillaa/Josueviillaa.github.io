@@ -50,4 +50,27 @@ const notes = defineCollection({
   }),
 });
 
-export const collections = { writeups, notes };
+/**
+ * Herramientas. Utilidades y scripts propios (ofensiva / forense). Un
+ * archivo .md/.mdx por herramienta en src/content/tools/. El script real
+ * vive en /public/tools/ para poder descargarse y verse en GitHub.
+ */
+const tools = defineCollection({
+  loader: glob({ pattern: '**/[^_]*.{md,mdx}', base: './src/content/tools' }),
+  schema: z.object({
+    title: z.string(),
+    /** Una frase: qué hace la herramienta. */
+    summary: z.string(),
+    date: z.coerce.date(),
+    /** Lenguaje principal, p. ej. "PowerShell" o "Python". */
+    language: z.string().default('PowerShell'),
+    /** Ruta del fichero descargable bajo /public (ej. "/tools/x.ps1"). */
+    download: z.string(),
+    /** URL completa al fichero en GitHub. */
+    repo: z.string().url().optional(),
+    tags: z.array(z.string()).default([]),
+    draft: z.boolean().default(false),
+  }),
+});
+
+export const collections = { writeups, notes, tools };

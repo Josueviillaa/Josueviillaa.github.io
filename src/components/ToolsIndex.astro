@@ -1,0 +1,51 @@
+---
+import ToolCard from './ToolCard.astro';
+import Icon from './Icon.astro';
+import { getTools } from '../lib/tools';
+import { getLang, homeHref, useT } from '../i18n';
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+
+const tools = await getTools();
+const countWord = tools.length === 1 ? t('tools.count_one') : t('tools.count_many');
+---
+
+<section class="wrap pt-10 pb-20 sm:pt-12 sm:pb-24">
+  <a
+    href={homeHref(lang)}
+    class="inline-flex items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-accent"
+  >
+    <Icon name="arrow-left" size={14} /> {t('writeups.back')}
+  </a>
+
+  <header class="mt-8 flex flex-col gap-3 border-b border-line pb-10">
+    <p class="flex items-center gap-3 font-mono text-xs text-faint">
+      <span class="font-medium text-accent">$</span>
+      <span class="h-px w-8 bg-line-strong" aria-hidden="true"></span>
+      <span>{t('tools.kicker')}</span>
+      {tools.length > 0 && (
+        <>
+          <span class="text-line-strong">·</span>
+          <span>{tools.length} {countWord}</span>
+        </>
+      )}
+    </p>
+    <h1 class="text-4xl font-bold sm:text-5xl">{t('tools.title')}</h1>
+    <p class="max-w-2xl text-muted">{t('tools.intro')}</p>
+  </header>
+
+  {
+    tools.length ? (
+      <ul class="mt-10 grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
+        {tools.map((entry) => (
+          <li>
+            <ToolCard entry={entry} />
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="mt-10 font-mono text-sm text-faint">{t('tools.empty')}</p>
+    )
+  }
+</section>

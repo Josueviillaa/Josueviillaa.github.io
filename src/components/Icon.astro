@@ -1,7 +1,7 @@
 ---
 /** Iconos SVG en línea. Heredan el color del texto (currentColor). */
 interface Props {
-  name: 'github' | 'linkedin' | 'htb' | 'sun' | 'moon' | 'arrow-right' | 'arrow-left' | 'mail';
+  name: 'github' | 'linkedin' | 'htb' | 'sun' | 'moon' | 'arrow-right' | 'arrow-left' | 'mail' | 'download';
   size?: number;
   class?: string;
 }
@@ -47,6 +47,12 @@ const { name, size = 16, class: className } = Astro.props;
     <>
       <rect x="3" y="5" width="18" height="14" rx="2" />
       <path d="m3 7 9 6 9-6" />
+    </>
+  )}
+  {name === 'download' && (
+    <>
+      <path d="M12 3v12M7 10l5 5 5-5" />
+      <path d="M5 21h14" />
     </>
   )}
 </svg>

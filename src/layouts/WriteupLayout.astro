@@ -3,15 +3,18 @@ import type { MarkdownHeading } from 'astro';
 import BaseLayout from './BaseLayout.astro';
 import DifficultyBadge from '../components/DifficultyBadge.astro';
 import Icon from '../components/Icon.astro';
+import WriteupPager from '../components/writeup/WriteupPager.astro';
 import { formatDate, type Writeup } from '../lib/writeups';
 import { withBase } from '../lib/url';
 
 interface Props {
   entry: Writeup;
   headings: MarkdownHeading[];
+  prev?: { id: string; title: string } | null;
+  next?: { id: string; title: string } | null;
 }
 
-const { entry, headings } = Astro.props;
+const { entry, headings, prev = null, next = null } = Astro.props;
 const { title, platform, os, difficulty, date, ports, tags, summary, retired } = entry.data;
 
 // Cada "## " del writeup es una fase
@@ -127,10 +130,12 @@ const phases = headings.filter((h) => h.depth === 2);
       </div>
     </div>
 
+    <WriteupPager prev={prev} next={next} />
+
     <footer class="mt-16 border-t border-line pt-6">
       <p class="max-w-3xl font-mono text-xs leading-relaxed text-faint">
-        <span class="text-warn">aviso</span> · Contenido con fines educativos sobre una máquina
-        {retired ? 'retirada' : ''} de {platform}, resuelta en su laboratorio autorizado. Se explican los conceptos de cada
+        <span class="text-warn">aviso</span> · Contenido con fines educativos sobre una máquina{retired ? ' retirada' : ''} de
+        {' '}{platform}, resuelta en su laboratorio autorizado. Se explican los conceptos de cada
         vector, no se publican credenciales ni payloads listos para usar. No apliques estas técnicas contra sistemas sin
         permiso explícito.
       </p>

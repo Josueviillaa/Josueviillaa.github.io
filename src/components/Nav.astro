@@ -32,6 +32,7 @@ const items: NavItem[] = [
   { kind: 'page', href: pageHref('/writeups/'), label: t('nav.writeups') },
   { kind: 'anchor', id: 'contacto', label: t('nav.contact') },
   { kind: 'page', href: pageHref('/notas/'), label: t('nav.notes') },
+  { kind: 'page', href: pageHref('/herramientas/'), label: t('nav.tools') },
 ];
 
 const anchorHref = (id: string) => (isHome ? `#${id}` : `${home}#${id}`);

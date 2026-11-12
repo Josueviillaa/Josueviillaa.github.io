@@ -43,7 +43,7 @@ function logicalPath(url: URL): string {
  */
 export function switchHref(url: URL, target: Lang): string {
   let logical = logicalPath(url);
-  logical = logical.replace(/^(writeups|notas)\/.+$/, '$1/');
+  logical = logical.replace(/^(writeups|notas|herramientas)\/.+$/, '$1/');
   const prefix = target === 'en' ? 'en/' : '';
   return withBase(`/${prefix}${logical}`);
 }
@@ -114,6 +114,21 @@ const ui = {
       'Nota técnica con fines educativos. Se describe el concepto del vector de forma genérica, para aplicarlo solo en entornos autorizados.',
     'note.read': 'leer',
 
+    'nav.tools': 'herramientas',
+    'tools.kicker': 'herramientas',
+    'tools.title': 'Herramientas',
+    'tools.intro':
+      'Utilidades y scripts que he escrito resolviendo máquinas y laboratorios. Código abierto, documentado y pensado para usarse solo en entornos autorizados.',
+    'tools.empty': 'Aún no hay herramientas publicadas.',
+    'tools.count_one': 'herramienta',
+    'tools.count_many': 'herramientas',
+    'tools.footer':
+      'Herramienta con fines educativos y de investigación. Úsala únicamente sobre sistemas propios o con autorización explícita.',
+    'tool.read': 'ver',
+    'tool.download': 'Descargar',
+    'tool.github': 'Ver en GitHub',
+    'tool.lang_label': 'lenguaje',
+
     'contact.kicker': 'contacto',
     'contact.title': 'Hablemos',
     'contact.body':
@@ -138,6 +153,10 @@ const ui = {
     'copy.aria_suffix': 'al portapapeles',
     'copy.status_ok': 'Email copiado al portapapeles',
     'copy.status_fallback': 'Email seleccionado, pulsa Ctrl+C para copiarlo',
+
+    'pager.aria': 'Navegación entre writeups',
+    'pager.prev': 'anterior',
+    'pager.next': 'siguiente',
   },
 
   en: {
@@ -202,6 +221,21 @@ const ui = {
       'Technical note for educational purposes. The vector is described generically, to be applied only in authorized environments.',
     'note.read': 'read',
 
+    'nav.tools': 'tools',
+    'tools.kicker': 'tools',
+    'tools.title': 'Tools',
+    'tools.intro':
+      'Utilities and scripts I wrote while solving machines and labs. Open source, documented and meant to be used only in authorized environments.',
+    'tools.empty': 'No tools published yet.',
+    'tools.count_one': 'tool',
+    'tools.count_many': 'tools',
+    'tools.footer':
+      'Tool for educational and research purposes. Use it only against your own systems or with explicit authorization.',
+    'tool.read': 'view',
+    'tool.download': 'Download',
+    'tool.github': 'View on GitHub',
+    'tool.lang_label': 'language',
+
     'contact.kicker': 'contact',
     'contact.title': "Let's talk",
     'contact.body':
@@ -226,6 +260,10 @@ const ui = {
     'copy.aria_suffix': 'to clipboard',
     'copy.status_ok': 'Email copied to clipboard',
     'copy.status_fallback': 'Email selected, press Ctrl+C to copy it',
+
+    'pager.aria': 'Writeup navigation',
+    'pager.prev': 'previous',
+    'pager.next': 'next',
   },
 } as const;
 
