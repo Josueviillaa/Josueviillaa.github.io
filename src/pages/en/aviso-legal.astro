@@ -1,0 +1,77 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { site } from '../../config/site';
+---
+
+<BaseLayout
+  title="Legal notice"
+  description="Legal notice and terms of use for the content and tools published on Josué's website."
+>
+  <section class="wrap max-w-2xl py-16 sm:py-20">
+    <h1 class="text-4xl font-bold sm:text-5xl">Legal notice</h1>
+    <p class="mt-4 text-muted">Terms of use for the content and tools published on this website.</p>
+
+    <div class="mt-10 space-y-6 text-muted">
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Purpose</h2>
+        <p class="mt-2">
+          This website is Josué's <strong class="text-text">personal portfolio</strong>. All of its content
+          —write-ups, technical notes and tools— is published for
+          <strong class="text-text">educational and research purposes</strong> in information security.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Authorized environments</h2>
+        <p class="mt-2">
+          The techniques described were carried out in ethical-hacking labs and platforms (such as HackTheBox),
+          in <strong class="text-text">controlled and authorized environments</strong>. No solutions to active
+          machines, credentials or real data are published.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">No warranty</h2>
+        <p class="mt-2">
+          The content and tools are provided <strong class="text-text">“as is”</strong>, without warranty of any
+          kind, express or implied, including their accuracy, fitness for a particular purpose or uninterrupted
+          operation.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Responsible use</h2>
+        <p class="mt-2">
+          Use the information and tools <strong class="text-text">only against systems you own or are explicitly
+          authorized in writing to test</strong>. Using them is solely your responsibility.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Disclaimer of liability</h2>
+        <p class="mt-2">
+          The author <strong class="text-text">accepts no liability</strong> for misuse or for any damage, direct
+          or indirect, arising from the use of the information or tools published here. Unauthorized
+          <strong class="text-text">access to computer systems</strong> you do not own is a crime in most
+          jurisdictions.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Intellectual property and license</h2>
+        <p class="mt-2">
+          The website code and the tools are published under the <strong class="text-text">MIT license</strong>.
+          Third-party trademarks, logos and names belong to their respective owners and are cited for
+          identification purposes only.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Contact</h2>
+        <p class="mt-2">
+          Questions or takedown requests? Email me at <code class="font-mono text-sm text-text">{site.email}</code>.
+        </p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -67,6 +67,7 @@ const ui = {
     'footer.note': 'Construido con Astro · contenido educativo sobre entornos autorizados',
     'privacy.nav': 'privacidad',
     'privacy.title': 'Privacidad',
+    'legal.nav': 'aviso legal',
     'notice.text': 'Esta web solo guarda tus preferencias (tema e idioma) en tu navegador. Sin cookies de seguimiento.',
     'notice.ok': 'Entendido',
     'notice.more': 'Más info',
@@ -122,11 +123,6 @@ const ui = {
     'tools.empty': 'Aún no hay herramientas publicadas.',
     'tools.count_one': 'herramienta',
     'tools.count_many': 'herramientas',
-    'tools.footer':
-      'Herramienta con fines educativos y de investigación. Úsala únicamente sobre sistemas propios o con autorización explícita.',
-    'tools.disclaimer.title': 'Aviso legal',
-    'tools.disclaimer.body':
-      'Las herramientas de esta sección se publican con fines educativos y de investigación en seguridad. Se ofrecen «tal cual», sin garantía de ningún tipo. Úsalas únicamente sobre sistemas de tu propiedad o con autorización expresa y por escrito; su uso es responsabilidad exclusiva de quien las ejecuta. El autor no se responsabiliza del uso indebido ni de los daños que puedan derivarse. El acceso no autorizado a sistemas informáticos es un delito.',
     'tool.read': 'ver',
     'tool.download': 'Descargar',
     'tool.github': 'Ver en GitHub',
@@ -177,6 +173,7 @@ const ui = {
     'footer.note': 'Built with Astro · educational content on authorized environments',
     'privacy.nav': 'privacy',
     'privacy.title': 'Privacy',
+    'legal.nav': 'legal',
     'notice.text': 'This site only stores your preferences (theme and language) in your browser. No tracking cookies.',
     'notice.ok': 'Got it',
     'notice.more': 'Learn more',
@@ -232,11 +229,6 @@ const ui = {
     'tools.empty': 'No tools published yet.',
     'tools.count_one': 'tool',
     'tools.count_many': 'tools',
-    'tools.footer':
-      'Tool for educational and research purposes. Use it only against your own systems or with explicit authorization.',
-    'tools.disclaimer.title': 'Legal notice',
-    'tools.disclaimer.body':
-      'The tools in this section are published for educational and security-research purposes. They are provided “as is”, without warranty of any kind. Use them only against systems you own or are explicitly authorized in writing to test; using them is solely your responsibility. The author accepts no liability for misuse or any resulting damage. Unauthorized access to computer systems is a crime.',
     'tool.read': 'view',
     'tool.download': 'Download',
     'tool.github': 'View on GitHub',

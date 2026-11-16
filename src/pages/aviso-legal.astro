@@ -1,0 +1,78 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { site } from '../config/site';
+---
+
+<BaseLayout
+  title="Aviso legal"
+  description="Aviso legal y condiciones de uso del contenido y las herramientas publicadas en la web de Josué."
+>
+  <section class="wrap max-w-2xl py-16 sm:py-20">
+    <h1 class="text-4xl font-bold sm:text-5xl">Aviso legal</h1>
+    <p class="mt-4 text-muted">Condiciones de uso del contenido y las herramientas publicadas en esta web.</p>
+
+    <div class="mt-10 space-y-6 text-muted">
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Finalidad</h2>
+        <p class="mt-2">
+          Esta web es el <strong class="text-text">portfolio personal</strong> de Josué. Todo su contenido
+          —writeups, notas técnicas y herramientas— se publica con
+          <strong class="text-text">fines educativos y de divulgación</strong> en seguridad informática.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Entornos autorizados</h2>
+        <p class="mt-2">
+          Las técnicas descritas se han llevado a cabo en laboratorios y plataformas de hacking ético
+          (como HackTheBox), en <strong class="text-text">entornos controlados y autorizados</strong>. No se
+          publican soluciones de máquinas activas, credenciales ni datos reales.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Sin garantía</h2>
+        <p class="mt-2">
+          El contenido y las herramientas se ofrecen <strong class="text-text">«tal cual»</strong>, sin garantía
+          de ningún tipo, expresa o implícita, incluyendo su exactitud, idoneidad para un fin concreto o
+          funcionamiento ininterrumpido.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Uso responsable</h2>
+        <p class="mt-2">
+          Utiliza la información y las herramientas <strong class="text-text">únicamente sobre sistemas de tu
+          propiedad o con autorización expresa y por escrito</strong>. Su uso es responsabilidad exclusiva de
+          quien los emplea.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Exención de responsabilidad</h2>
+        <p class="mt-2">
+          El autor <strong class="text-text">no se hace responsable</strong> del uso indebido ni de los daños,
+          directos o indirectos, que puedan derivarse del uso de la información o las herramientas aquí
+          publicadas. El <strong class="text-text">acceso no autorizado</strong> a sistemas informáticos ajenos
+          constituye un delito en la mayoría de jurisdicciones.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Propiedad intelectual y licencia</h2>
+        <p class="mt-2">
+          El código de la web y las herramientas se publican bajo <strong class="text-text">licencia MIT</strong>.
+          Las marcas, logotipos y nombres de terceros pertenecen a sus respectivos propietarios y se citan
+          únicamente con fines identificativos.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="font-display text-xl font-semibold text-text">Contacto</h2>
+        <p class="mt-2">
+          ¿Dudas o retirada de contenido? Escríbeme a <code class="font-mono text-sm text-text">{site.email}</code>.
+        </p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

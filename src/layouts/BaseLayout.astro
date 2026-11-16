@@ -151,6 +151,9 @@ const personLd = {
       <div class="wrap flex flex-col gap-2 py-8 font-mono text-xs text-faint sm:flex-row sm:items-center sm:justify-between">
         <p>© {year} {site.name}</p>
         <div class="flex items-center gap-4">
+          <a href={withBase(lang === 'en' ? '/en/aviso-legal/' : '/aviso-legal/')} class="transition-colors hover:text-text">
+            {t('legal.nav')}
+          </a>
           <a href={withBase(lang === 'en' ? '/en/privacy/' : '/privacidad/')} class="transition-colors hover:text-text">
             {t('privacy.nav')}
           </a>
