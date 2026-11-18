@@ -13,7 +13,7 @@ const t = useT(lang);
   <div class="wrap py-20 sm:py-24">
     <SectionHeader n="03" label={t('certs.kicker')} title={t('certs.title')} />
 
-    <div class="grid gap-5 md:grid-cols-2">
+    <div class="grid gap-4 md:grid-cols-2">
       {certs.map((cert) => <CertCard cert={cert} />)}
     </div>
   </div>

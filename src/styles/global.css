@@ -12,12 +12,12 @@
 @property --accent {
   syntax: "<color>";
   inherits: true;
-  initial-value: #2ee6c3;
+  initial-value: #22c55e;
 }
 @property --accent-ink {
   syntax: "<color>";
   inherits: true;
-  initial-value: #04211b;
+  initial-value: #052e16;
 }
 
 :root {
@@ -33,9 +33,9 @@
   --text-muted: #a3aeb9;
   --text-faint: #7d8590;
 
-  /* Acento por defecto (teal); lo sobrescribe [data-accent]. */
-  --accent: #2ee6c3;
-  --accent-ink: #04211b; /* texto sobre fondo de acento */
+  /* Acento por defecto (verde, el de ekul); lo sobrescribe [data-accent]. */
+  --accent: #22c55e;
+  --accent-ink: #052e16; /* texto sobre fondo de acento */
   --warn: #ffb454;
   --crit: #ff6b6b;
 
@@ -43,14 +43,14 @@
   transition: --accent 0.55s ease, --accent-ink 0.55s ease;
 }
 
-/* Paletas de acento: fondo oscuro fijo, solo cambia el color.
-   Cada ink es un tono muy oscuro del color para texto sobre el acento. */
-:root[data-accent="green"]   { --accent: #3ee66b; --accent-ink: #052310; }
-:root[data-accent="cyan"]    { --accent: #49b4ff; --accent-ink: #04172b; }
-:root[data-accent="amber"]   { --accent: #f5b53d; --accent-ink: #241700; }
-:root[data-accent="magenta"] { --accent: #ff5cc0; --accent-ink: #2a0420; }
-:root[data-accent="red"]     { --accent: #ff6670; --accent-ink: #2a0608; }
-:root[data-accent="purple"]  { --accent: #b48cff; --accent-ink: #150a2e; }
+/* Paletas de acento: mismos colores que ekul.me (tono 500 de Tailwind).
+   Fondo oscuro fijo, solo cambia el color; ink = tono 950 para texto encima. */
+:root[data-accent="green"] { --accent: #22c55e; --accent-ink: #052e16; }
+:root[data-accent="cyan"]  { --accent: #06b6d4; --accent-ink: #083344; }
+:root[data-accent="blue"]  { --accent: #7ab2f4; --accent-ink: #0c112b; }
+:root[data-accent="pink"]  { --accent: #ec4899; --accent-ink: #500724; }
+:root[data-accent="red"]   { --accent: #ef4444; --accent-ink: #450a0a; }
+:root[data-accent="grey"]  { --accent: #bebebe; --accent-ink: #262626; }
 
 /* Derivados: se recalculan solos con el acento activo */
 :root {

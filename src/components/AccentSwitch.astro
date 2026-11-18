@@ -9,15 +9,15 @@ import { getLang } from '../i18n';
 
 const lang = getLang(Astro.url);
 
-// Orden del ciclo. 'teal' es el acento por defecto (sin override en CSS).
+// Orden del ciclo. Mismos colores que ekul.me; 'green' es el acento por
+// defecto (coincide con :root, sin override en CSS).
 const accents = [
-  { key: 'teal', es: 'teal', en: 'teal' },
   { key: 'green', es: 'verde', en: 'green' },
   { key: 'cyan', es: 'cian', en: 'cyan' },
-  { key: 'amber', es: 'ámbar', en: 'amber' },
-  { key: 'magenta', es: 'magenta', en: 'magenta' },
+  { key: 'blue', es: 'azul', en: 'blue' },
+  { key: 'pink', es: 'rosa', en: 'pink' },
   { key: 'red', es: 'rojo', en: 'red' },
-  { key: 'purple', es: 'púrpura', en: 'purple' },
+  { key: 'grey', es: 'gris', en: 'grey' },
 ];
 const keys = accents.map((a) => a.key);
 const names = accents.map((a) => a[lang]);

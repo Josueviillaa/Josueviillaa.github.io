@@ -33,20 +33,16 @@ const gid = `m-${cert.code}`;
       <polygon points="100,0 200,55 200,165 100,220 0,165 0,55" fill={`url(#${gid})`}></polygon>
 
       <!-- Brillo superior muy sutil (gloss) -->
-      <polygon points="100,0 200,55 100,112 0,55" fill="#ffffff" opacity="0.05"></polygon>
+      <polygon points="100,0 200,55 100,112 0,55" fill="#ffffff" opacity="0.045"></polygon>
 
-      <!-- Aro fino exterior (acento) + hairline interior -->
-      <polygon
-        class="rim"
-        points="100,0 200,55 200,165 100,220 0,165 0,55"
-        fill="none"
-        stroke-width="1.2"></polygon>
+      <!-- Aro fino exterior (plata neutra) + hairline interior -->
+      <polygon class="rim" points="100,0 200,55 200,165 100,220 0,165 0,55" fill="none" stroke-width="1.2"></polygon>
       <polygon
         points="100,7 192,57 192,163 100,213 8,163 8,57"
         fill="none"
         stroke="#ffffff"
         stroke-width="0.5"
-        opacity="0.07"></polygon>
+        opacity="0.06"></polygon>
 
       <!-- Código grabado (sombra + luz) -->
       <text
@@ -66,18 +62,18 @@ const gid = `m-${cert.code}`;
         >{cert.code}</text>
     </svg>
 
-    <!-- Reflejo fino que glisa con el ratón -->
+    <!-- Reflejo blando que glisa con el ratón, muy discreto -->
     <span class="cert-shine"></span>
   </div>
 
   <div class="min-w-0 flex-1">
     <div class="flex items-start justify-between gap-3">
-      <h3 class="text-base leading-snug font-semibold text-text sm:text-lg">{cert.name}</h3>
+      <h3 class="text-[0.95rem] leading-snug font-semibold text-text sm:text-base">{cert.name}</h3>
       <span class="cert-pill">{statusLabel}</span>
     </div>
-    <p class="mt-1.5 font-mono text-xs text-faint">{cert.issuer}{cert.date && ` · ${cert.date}`}</p>
+    <p class="mt-1 font-mono text-xs text-faint">{cert.issuer}{cert.date && ` · ${cert.date}`}</p>
 
-    {cert.note && <p class="mt-3 text-sm text-muted">{cert.note}</p>}
+    {cert.note && <p class="mt-2.5 text-sm text-muted">{cert.note}</p>}
 
     {
       cert.verifyUrl && (
@@ -85,7 +81,7 @@ const gid = `m-${cert.code}`;
           href={cert.verifyUrl}
           target="_blank"
           rel="noopener noreferrer"
-          class="link mt-4 inline-flex items-center gap-1.5 font-mono text-xs"
+          class="link mt-3 inline-flex items-center gap-1.5 font-mono text-xs"
         >
           {t('cert.verify')} <Icon name="arrow-right" size={14} />
         </a>
@@ -95,7 +91,7 @@ const gid = `m-${cert.code}`;
 </article>
 
 <style>
-  /* Posición del reflejo (0–100). Registrada para transicionarla: el brillo
+  /* Posición del reflejo (0–100), registrada para transicionarla: el brillo
      glisa hacia el ratón en vez de saltar. */
   @property --mx {
     syntax: '<number>';
@@ -108,50 +104,45 @@ const gid = `m-${cert.code}`;
     initial-value: 32;
   }
 
+  /* Tarjeta compacta y coherente con las de notas/herramientas */
   .cert-card {
     display: flex;
     align-items: center;
-    gap: 1.25rem;
+    gap: 1rem;
     border: 1px solid var(--line);
-    border-left-width: 2px;
-    border-radius: 0 0.7rem 0.7rem 0;
+    border-radius: 0.7rem;
     background: var(--surface);
-    padding: 1.4rem 1.5rem;
+    padding: 1rem 1.15rem;
     transition: border-color 0.3s ease;
   }
-  .is-obtenida {
-    border-left-color: var(--accent);
+  .cert-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
   }
-  .is-en-curso {
-    border-left-color: var(--warn);
-  }
-  .is-planificada {
-    border-left-color: var(--line-strong);
+  @media (min-width: 640px) {
+    .cert-card {
+      gap: 1.15rem;
+      padding: 1.15rem 1.35rem;
+    }
   }
 
-  /* Emblema — fino y sobrio */
+  /* Emblema: metal sobrio, independiente del color de acento */
   .cert-badge {
     --mx: 50;
     --my: 32;
-    --rim: var(--accent);
     position: relative;
-    width: 84px;
-    height: 92px;
+    width: 60px;
+    height: 66px;
     flex: none;
-    filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.38));
+    filter: drop-shadow(0 4px 9px rgba(0, 0, 0, 0.35));
     transition:
-      --mx 0.5s cubic-bezier(0.22, 1, 0.36, 1),
-      --my 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+      --mx 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+      --my 0.55s cubic-bezier(0.22, 1, 0.36, 1),
       transform 0.4s ease,
       filter 0.4s ease;
   }
-  .is-en-curso .cert-badge {
-    --rim: var(--warn);
-  }
   .is-planificada .cert-badge {
-    --rim: var(--line-strong);
-    filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.28)) grayscale(0.4) brightness(0.86);
-    opacity: 0.82;
+    filter: drop-shadow(0 4px 9px rgba(0, 0, 0, 0.25)) grayscale(0.5) brightness(0.8);
+    opacity: 0.7;
   }
 
   .cert-medal {
@@ -161,9 +152,10 @@ const gid = `m-${cert.code}`;
     height: 100%;
     overflow: visible;
   }
+  /* Aro plata neutro (no depende del acento, por eso ya no "canta") */
   .rim {
-    stroke: var(--rim);
-    opacity: 0.4;
+    stroke: #ffffff;
+    opacity: 0.16;
   }
   .code {
     fill: #e8eef2;
@@ -172,7 +164,7 @@ const gid = `m-${cert.code}`;
     fill: #aeb8c0;
   }
 
-  /* Reflejo: un único foco de luz blando, recortado al hexágono. Discreto. */
+  /* Reflejo: foco de luz blando recortado al hexágono, muy discreto */
   .cert-shine {
     position: absolute;
     inset: 0;
@@ -180,28 +172,28 @@ const gid = `m-${cert.code}`;
     clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
     background: radial-gradient(
       75% 65% at calc(var(--mx) * 1%) calc(var(--my) * 1%),
-      rgba(255, 255, 255, 0.11),
+      rgba(255, 255, 255, 0.08),
       rgba(255, 255, 255, 0) 72%
     );
     mix-blend-mode: screen;
-    opacity: 0.8;
+    opacity: 0.7;
     transition: opacity 0.4s ease;
   }
   .is-planificada .cert-shine {
-    opacity: 0.08;
+    opacity: 0.05;
   }
 
-  /* Hover: sube un pelo y aparece un halo muy tenue del acento. */
+  /* Hover: leve elevación y sombra; sin halo de color (más calmado) */
   .cert-card:hover .cert-badge {
     transform: translateY(-2px);
+    filter: drop-shadow(0 7px 14px rgba(0, 0, 0, 0.4));
   }
-  .is-obtenida:hover .cert-badge,
-  .is-en-curso:hover .cert-badge {
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.42))
-      drop-shadow(0 0 8px color-mix(in srgb, var(--rim) 30%, transparent));
+  .is-planificada:hover .cert-badge {
+    transform: translateY(-2px);
+    filter: drop-shadow(0 7px 14px rgba(0, 0, 0, 0.3)) grayscale(0.5) brightness(0.8);
   }
   .cert-card:hover .cert-shine {
-    opacity: 0.92;
+    opacity: 0.82;
   }
 
   /* Píldora de estado */
@@ -242,12 +234,12 @@ const gid = `m-${cert.code}`;
 
   @media (max-width: 400px) {
     .cert-card {
-      gap: 1rem;
-      padding: 1.25rem;
+      gap: 0.9rem;
+      padding: 1rem;
     }
     .cert-badge {
-      width: 72px;
-      height: 79px;
+      width: 52px;
+      height: 57px;
     }
   }
 </style>
