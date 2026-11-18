@@ -29,6 +29,7 @@ const items: Item[] = [
   { label: t('nav.notes'), href: p('/notas/'), kind: 'page' },
   { label: t('nav.tools'), href: p('/herramientas/'), kind: 'page' },
   { label: t('lab.title'), href: p('/herramientas/lab/'), kind: 'page' },
+  { label: t('stats.title'), href: p('/stats/'), kind: 'page' },
   ...writeups.map((e) => ({ label: e.data.title, href: withBase(`/writeups/${e.id}/`), kind: 'writeup', keywords: e.data.tags.join(' ') })),
   ...notes.map((e) => ({ label: e.data.title, href: withBase(`/notas/${e.id}/`), kind: 'note', keywords: e.data.tags.join(' ') })),
   ...tools.map((e) => ({ label: e.data.title, href: withBase(`/herramientas/${e.id}/`), kind: 'tool' })),

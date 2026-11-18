@@ -1,0 +1,138 @@
+---
+import Icon from './Icon.astro';
+import { getWriteups } from '../lib/writeups';
+import { attack } from '../data/attack';
+import { site } from '../config/site';
+import { withBase } from '../lib/url';
+import { getLang, useT, homeHref } from '../i18n';
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+
+const writeups = await getWriteups();
+const wmap = Object.fromEntries(
+  writeups.map((w) => [w.id, { title: w.data.title, href: withBase(`/writeups/${w.id}/`) }]),
+) as Record<string, { title: string; href: string }>;
+
+const osFamily = (os: string) => (os.toLowerCase().startsWith('windows') ? 'Windows' : 'Linux');
+const tally = (arr: string[]) => arr.reduce<Record<string, number>>((m, k) => ((m[k] = (m[k] || 0) + 1), m), {});
+
+const osData = tally(writeups.map((w) => osFamily(w.data.os)));
+const diffOrder = ['Easy', 'Medium', 'Hard', 'Insane'];
+const diffCount = tally(writeups.map((w) => w.data.difficulty));
+const diffData = diffOrder.filter((d) => diffCount[d]).map((d) => [d, diffCount[d]] as [string, number]);
+
+const allTags = writeups.flatMap((w) => w.data.tags.map((x) => x.toLowerCase().trim()));
+const techniquesCount = new Set(allTags).size;
+const cves = [...new Set(allTags.filter((x) => /^cve-/.test(x)))];
+const noise = new Set(['linux', 'windows']);
+const tagCounts = tally(allTags.filter((x) => !noise.has(x) && !/^cve-/.test(x)));
+const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+const tiles = [
+  { n: site.htb.machines, label: t('stats.solved') },
+  { n: writeups.length, label: t('stats.documented') },
+  { n: techniquesCount, label: t('stats.techniques') },
+  { n: cves.length, label: t('stats.cves') },
+];
+
+type Bars = { title: string; rows: [string, number][] };
+const charts: Bars[] = [
+  { title: t('stats.byOS'), rows: Object.entries(osData).sort((a, b) => b[1] - a[1]) },
+  { title: t('stats.byDifficulty'), rows: diffData },
+  { title: t('stats.topTech'), rows: topTags },
+];
+const maxOf = (rows: [string, number][]) => Math.max(1, ...rows.map((r) => r[1]));
+---
+
+<section class="wrap pt-10 pb-20 sm:pt-12 sm:pb-24">
+  <a
+    href={homeHref(lang)}
+    class="inline-flex items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-accent"
+  >
+    <Icon name="arrow-left" size={14} /> {t('writeups.back')}
+  </a>
+
+  <header class="mt-8 flex flex-col gap-3 border-b border-line pb-10">
+    <p class="flex items-center gap-3 font-mono text-xs text-faint">
+      <span class="font-medium text-accent">#</span>
+      <span class="h-px w-8 bg-line-strong" aria-hidden="true"></span>
+      <span>{t('stats.kicker')}</span>
+    </p>
+    <h1 class="text-4xl font-bold sm:text-5xl">{t('stats.title')}</h1>
+    <p class="max-w-2xl text-muted">{t('stats.intro')}</p>
+  </header>
+
+  <!-- Tiles -->
+  <div class="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
+    {
+      tiles.map((tile) => (
+        <div class="rounded-lg border border-line bg-surface p-5">
+          <p class="font-display text-4xl font-bold text-text">{tile.n}</p>
+          <p class="mt-1 font-mono text-xs text-faint">{tile.label}</p>
+        </div>
+      ))
+    }
+  </div>
+
+  <!-- Barras -->
+  <div class="mt-5 grid gap-4 md:grid-cols-3">
+    {
+      charts.map((chart) => {
+        const max = maxOf(chart.rows);
+        return (
+          <div class="rounded-lg border border-line bg-surface p-5">
+            <p class="font-mono text-xs text-faint">{chart.title}</p>
+            <div class="mt-4 space-y-2.5">
+              {chart.rows.map(([label, n]) => (
+                <div class="flex items-center gap-3 font-mono text-xs">
+                  <span class="w-24 shrink-0 truncate text-muted">{label}</span>
+                  <span class="h-2 flex-1 overflow-hidden rounded-full bg-line">
+                    <span class="block h-full rounded-full bg-accent" style={`width:${(n / max) * 100}%`} />
+                  </span>
+                  <span class="w-5 shrink-0 text-right text-faint">{n}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })
+    }
+  </div>
+
+  <!-- Matriz ATT&CK -->
+  <header class="mt-16 flex flex-col gap-2 border-b border-line pb-6">
+    <h2 class="text-2xl font-semibold sm:text-3xl">{t('stats.attack')}</h2>
+    <p class="max-w-2xl text-sm text-muted">{t('stats.attackNote')}</p>
+  </header>
+
+  <div class="mt-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,16rem),1fr))]">
+    {
+      attack.map((tac) => (
+        <div class="rounded-lg border border-line bg-surface p-4">
+          <p class="border-b border-line pb-2 font-mono text-xs text-faint">
+            <span class="text-accent">{tac.id}</span> · {tac.name[lang]}
+          </p>
+          <ul class="mt-3 space-y-3.5">
+            {tac.techniques.map((tech) => (
+              <li>
+                <p class="font-mono text-[0.8125rem] leading-snug">
+                  <span class="text-accent">{tech.id}</span> <span class="text-text">{tech.name}</span>
+                </p>
+                <ul class="mt-1.5 flex flex-wrap gap-1.5">
+                  {tech.writeups.filter((s) => wmap[s]).map((s) => (
+                    <li>
+                      <a href={wmap[s].href} class="rounded-sm bg-raised px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted transition-colors hover:text-accent">
+                        {wmap[s].title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))
+    }
+  </div>
+</section>
