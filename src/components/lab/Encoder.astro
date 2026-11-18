@@ -1,0 +1,80 @@
+---
+import { getLang } from '../../i18n';
+const lang = getLang(Astro.url);
+const L =
+  lang === 'en'
+    ? { mode: 'mode', input: 'input text', output: 'output', enc: 'encode', dec: 'decode', clear: 'clear', copy: 'copy', err: '(invalid input for this mode)' }
+    : { mode: 'modo', input: 'texto de entrada', output: 'salida', enc: 'codificar', dec: 'decodificar', clear: 'limpiar', copy: 'copiar', err: '(entrada no válida para este modo)' };
+---
+
+<div data-encoder data-err={L.err} class="space-y-3">
+  <div class="flex flex-wrap items-center gap-2">
+    <label class="font-mono text-xs text-faint" for="enc-mode">{L.mode}</label>
+    <select id="enc-mode" data-enc-mode class="rounded-md border border-line bg-raised px-2 py-1 font-mono text-xs text-text">
+      <option value="base64">base64</option>
+      <option value="hex">hex</option>
+      <option value="url">url</option>
+      <option value="rot13">rot13</option>
+    </select>
+  </div>
+  <textarea data-enc-in rows="3" placeholder={L.input} class="lab-field" spellcheck="false"></textarea>
+  <div class="flex flex-wrap gap-2">
+    <button data-enc-encode type="button" class="lab-btn lab-btn-accent">{L.enc}</button>
+    <button data-enc-decode type="button" class="lab-btn">{L.dec}</button>
+    <button data-enc-clear type="button" class="lab-btn">{L.clear}</button>
+    <button data-enc-copy type="button" class="lab-btn ml-auto">{L.copy}</button>
+  </div>
+  <textarea data-enc-out rows="3" readonly placeholder={L.output} class="lab-field lab-field-out" spellcheck="false"></textarea>
+</div>
+
+<script>
+  const root = document.querySelector('[data-encoder]') as HTMLElement | null;
+  if (root) {
+    const mode = root.querySelector('[data-enc-mode]') as HTMLSelectElement;
+    const inp = root.querySelector('[data-enc-in]') as HTMLTextAreaElement;
+    const out = root.querySelector('[data-enc-out]') as HTMLTextAreaElement;
+    const errMsg = root.getAttribute('data-err') || '(invalid)';
+    const te = new TextEncoder();
+    const td = new TextDecoder();
+
+    const b64enc = (s: string) => btoa(String.fromCharCode(...te.encode(s)));
+    const b64dec = (s: string) => td.decode(Uint8Array.from(atob(s.trim()), (c) => c.charCodeAt(0)));
+    const hexenc = (s: string) => [...te.encode(s)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    const hexdec = (s: string) => {
+      const h = s.replace(/[^0-9a-fA-F]/g, '');
+      const a: number[] = [];
+      for (let i = 0; i < h.length - 1; i += 2) a.push(parseInt(h.substr(i, 2), 16));
+      return td.decode(Uint8Array.from(a));
+    };
+    const rot13 = (s: string) =>
+      s.replace(/[a-z]/gi, (c) => {
+        const b = c <= 'Z' ? 65 : 97;
+        return String.fromCharCode(((c.charCodeAt(0) - b + 13) % 26) + b);
+      });
+
+    let dir: 'enc' | 'dec' = 'enc';
+    function run() {
+      const v = inp.value;
+      const m = mode.value;
+      if (!v) { out.value = ''; return; }
+      try {
+        let r: string;
+        if (m === 'rot13') r = rot13(v);
+        else if (dir === 'enc') r = m === 'base64' ? b64enc(v) : m === 'hex' ? hexenc(v) : encodeURIComponent(v);
+        else r = m === 'base64' ? b64dec(v) : m === 'hex' ? hexdec(v) : decodeURIComponent(v);
+        out.value = r;
+      } catch {
+        out.value = errMsg;
+      }
+    }
+
+    inp.addEventListener('input', run);
+    mode.addEventListener('change', run);
+    (root.querySelector('[data-enc-encode]') as HTMLButtonElement).addEventListener('click', () => { dir = 'enc'; run(); });
+    (root.querySelector('[data-enc-decode]') as HTMLButtonElement).addEventListener('click', () => { dir = 'dec'; run(); });
+    (root.querySelector('[data-enc-clear]') as HTMLButtonElement).addEventListener('click', () => { inp.value = ''; out.value = ''; inp.focus(); });
+    (root.querySelector('[data-enc-copy]') as HTMLButtonElement).addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(out.value); } catch {}
+    });
+  }
+</script>

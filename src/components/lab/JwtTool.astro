@@ -1,0 +1,78 @@
+---
+import { getLang } from '../../i18n';
+const lang = getLang(Astro.url);
+const L =
+  lang === 'en'
+    ? { ph: 'paste a JWT (eyJ...)', header: 'HEADER', payload: 'PAYLOAD', note: 'The signature is not verified — this only decodes the token.', invalid: 'Not a valid JWT (needs 3 parts separated by dots).', empty: '—' }
+    : { ph: 'pega un JWT (eyJ...)', header: 'HEADER', payload: 'PAYLOAD', note: 'No se verifica la firma: esto solo decodifica el token.', invalid: 'No es un JWT válido (necesita 3 partes separadas por puntos).', empty: '—' };
+---
+
+<div data-jwt data-invalid={L.invalid} data-empty={L.empty} class="space-y-3">
+  <textarea data-jwt-in rows="3" placeholder={L.ph} class="lab-field" spellcheck="false"></textarea>
+  <div class="grid gap-3 sm:grid-cols-2">
+    <div>
+      <p class="mb-1 font-mono text-[0.6875rem] tracking-wide text-faint">{L.header}</p>
+      <pre data-jwt-header class="lab-pre">{L.empty}</pre>
+    </div>
+    <div>
+      <p class="mb-1 font-mono text-[0.6875rem] tracking-wide text-faint">{L.payload}</p>
+      <pre data-jwt-payload class="lab-pre">{L.empty}</pre>
+    </div>
+  </div>
+  <p data-jwt-meta class="font-mono text-[0.6875rem] text-faint"></p>
+  <p class="font-mono text-[0.6875rem] text-faint"><span class="text-warn">i</span> {L.note}</p>
+</div>
+
+<script>
+  const root = document.querySelector('[data-jwt]') as HTMLElement | null;
+  if (root) {
+    const inp = root.querySelector('[data-jwt-in]') as HTMLTextAreaElement;
+    const hEl = root.querySelector('[data-jwt-header]') as HTMLElement;
+    const pEl = root.querySelector('[data-jwt-payload]') as HTMLElement;
+    const metaEl = root.querySelector('[data-jwt-meta]') as HTMLElement;
+    const invalidMsg = root.getAttribute('data-invalid') || 'invalid';
+    const empty = root.getAttribute('data-empty') || '—';
+    const td = new TextDecoder();
+
+    const b64url = (s: string) => {
+      s = s.replace(/-/g, '+').replace(/_/g, '/');
+      while (s.length % 4) s += '=';
+      return td.decode(Uint8Array.from(atob(s), (c) => c.charCodeAt(0)));
+    };
+    const pretty = (s: string) => {
+      try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; }
+    };
+    const toDate = (n: unknown) => (typeof n === 'number' ? new Date(n * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : null);
+
+    function run() {
+      const v = inp.value.trim();
+      if (!v) { hEl.textContent = empty; pEl.textContent = empty; metaEl.textContent = ''; return; }
+      const parts = v.split('.');
+      if (parts.length < 2) { hEl.textContent = invalidMsg; pEl.textContent = empty; metaEl.textContent = ''; return; }
+      try {
+        const hRaw = b64url(parts[0]);
+        const pRaw = b64url(parts[1]);
+        hEl.textContent = pretty(hRaw);
+        pEl.textContent = pretty(pRaw);
+        let meta = '';
+        try {
+          const h = JSON.parse(hRaw);
+          const p = JSON.parse(pRaw);
+          const bits: string[] = [];
+          if (h.alg) bits.push(`alg: ${h.alg}`);
+          const iat = toDate(p.iat); if (iat) bits.push(`iat: ${iat}`);
+          const exp = toDate(p.exp);
+          if (exp) {
+            const expired = typeof p.exp === 'number' && p.exp * 1000 < Date.now();
+            bits.push(`exp: ${exp}${expired ? ' (expired)' : ''}`);
+          }
+          meta = bits.join('  ·  ');
+        } catch {}
+        metaEl.textContent = meta;
+      } catch {
+        hEl.textContent = invalidMsg; pEl.textContent = empty; metaEl.textContent = '';
+      }
+    }
+    inp.addEventListener('input', run);
+  }
+</script>

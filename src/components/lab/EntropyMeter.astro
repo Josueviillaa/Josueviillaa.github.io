@@ -1,0 +1,91 @@
+---
+import { getLang } from '../../i18n';
+const lang = getLang(Astro.url);
+const L =
+  lang === 'en'
+    ? { ph: 'type a password to analyse', show: 'show', hide: 'hide', bits: 'entropy', pool: 'charset', crack: 'crack time (offline, 10^10/s)', note: 'Runs only in your browser; nothing is typed is sent anywhere.',
+        levels: ['very weak', 'weak', 'reasonable', 'strong', 'very strong'], instant: 'instant' }
+    : { ph: 'escribe una contraseña para analizar', show: 'ver', hide: 'ocultar', bits: 'entropía', pool: 'alfabeto', crack: 'tiempo de crackeo (offline, 10^10/s)', note: 'Se ejecuta solo en tu navegador; nada de lo que escribes se envía.',
+        levels: ['muy débil', 'débil', 'razonable', 'fuerte', 'muy fuerte'], instant: 'instantáneo' };
+---
+
+<div data-entropy data-levels={JSON.stringify(L.levels)} data-instant={L.instant} class="space-y-3">
+  <div class="flex items-center gap-2">
+    <input data-ent-in type="password" placeholder={L.ph} class="lab-field" spellcheck="false" autocomplete="off" />
+    <button data-ent-toggle type="button" class="lab-btn shrink-0" data-show={L.show} data-hide={L.hide}>{L.show}</button>
+  </div>
+
+  <div class="grid grid-cols-2 gap-x-6 gap-y-2 font-mono text-xs sm:grid-cols-4">
+    <div><span class="text-faint">{L.bits}</span><br /><span data-ent-bits class="text-text">0 bits</span></div>
+    <div><span class="text-faint">len</span><br /><span data-ent-len class="text-text">0</span></div>
+    <div><span class="text-faint">{L.pool}</span><br /><span data-ent-pool class="text-text">0</span></div>
+    <div><span class="text-faint">nivel</span><br /><span data-ent-level class="text-text">—</span></div>
+  </div>
+
+  <div class="lab-meter"><span data-ent-bar></span></div>
+  <p class="font-mono text-xs"><span class="text-faint">{L.crack}:</span> <span data-ent-time class="text-text">—</span></p>
+  <p class="font-mono text-[0.6875rem] text-faint"><span class="text-accent">#</span> {L.note}</p>
+</div>
+
+<script>
+  const root = document.querySelector('[data-entropy]') as HTMLElement | null;
+  if (root) {
+    const inp = root.querySelector('[data-ent-in]') as HTMLInputElement;
+    const toggle = root.querySelector('[data-ent-toggle]') as HTMLButtonElement;
+    const bitsEl = root.querySelector('[data-ent-bits]') as HTMLElement;
+    const lenEl = root.querySelector('[data-ent-len]') as HTMLElement;
+    const poolEl = root.querySelector('[data-ent-pool]') as HTMLElement;
+    const levelEl = root.querySelector('[data-ent-level]') as HTMLElement;
+    const barEl = root.querySelector('[data-ent-bar]') as HTMLElement;
+    const timeEl = root.querySelector('[data-ent-time]') as HTMLElement;
+    const levels: string[] = JSON.parse(root.getAttribute('data-levels') || '[]');
+    const instant = root.getAttribute('data-instant') || 'instant';
+    const colors = ['#ff6b6b', '#ff6b6b', '#ffb454', '#22c55e', '#22c55e'];
+
+    const humanTime = (seconds: number) => {
+      if (seconds < 1) return instant;
+      const units: [number, string][] = [
+        [60, 's'], [60, 'min'], [24, 'h'], [365, 'd'], [100, 'y'], [10, 'c'],
+      ];
+      let v = seconds;
+      let label = 's';
+      for (const [factor, u] of units) {
+        if (v < factor) { label = u; break; }
+        v /= factor;
+        label = u;
+      }
+      if (v > 1e6) return '> 1M ' + label;
+      return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${label}`;
+    };
+
+    function run() {
+      const v = inp.value;
+      let pool = 0;
+      if (/[a-z]/.test(v)) pool += 26;
+      if (/[A-Z]/.test(v)) pool += 26;
+      if (/[0-9]/.test(v)) pool += 10;
+      if (/[^a-zA-Z0-9]/.test(v)) pool += 33;
+      const bits = v.length ? v.length * Math.log2(pool || 1) : 0;
+      // nivel: <28, <36, <60, <128, >=128
+      const idx = bits < 28 ? 0 : bits < 36 ? 1 : bits < 60 ? 2 : bits < 128 ? 3 : 4;
+
+      bitsEl.textContent = `${bits.toFixed(0)} bits`;
+      lenEl.textContent = String(v.length);
+      poolEl.textContent = String(pool);
+      levelEl.textContent = v ? levels[idx] : '—';
+      levelEl.style.color = v ? colors[idx] : '';
+      barEl.style.width = `${Math.min(100, (bits / 128) * 100)}%`;
+      barEl.style.background = colors[idx];
+      // tiempo: combinaciones / 2 / 1e10 guesses per sec
+      const seconds = v.length ? (Math.pow(pool || 1, v.length) / 2) / 1e10 : 0;
+      timeEl.textContent = v ? humanTime(seconds) : '—';
+    }
+
+    inp.addEventListener('input', run);
+    toggle.addEventListener('click', () => {
+      const show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      toggle.textContent = show ? toggle.dataset.hide! : toggle.dataset.show!;
+    });
+  }
+</script>

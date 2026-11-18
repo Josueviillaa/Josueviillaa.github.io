@@ -1,0 +1,25 @@
+---
+/** Tarjeta con "cromo de ventana": barra de título con 3 puntos y nombre de
+ *  fichero. Reutilizable en el Lab y, más adelante, en writeups/tools. */
+interface Props {
+  title: string;
+  /** Texto opcional a la derecha de la barra (p. ej. un hint). */
+  meta?: string;
+}
+const { title, meta } = Astro.props;
+---
+
+<section class="overflow-hidden rounded-lg border border-line bg-surface">
+  <div class="flex items-center gap-2 border-b border-line bg-raised px-4 py-2">
+    <span class="flex gap-1.5" aria-hidden="true">
+      <span class="size-2.5 rounded-full bg-crit/70"></span>
+      <span class="size-2.5 rounded-full bg-warn/70"></span>
+      <span class="size-2.5 rounded-full bg-accent/70"></span>
+    </span>
+    <span class="font-mono text-xs text-faint">{title}</span>
+    {meta && <span class="ml-auto font-mono text-[0.6875rem] text-faint">{meta}</span>}
+  </div>
+  <div class="p-4 sm:p-5">
+    <slot />
+  </div>
+</section>

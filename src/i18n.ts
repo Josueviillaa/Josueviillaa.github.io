@@ -127,6 +127,10 @@ const ui = {
     'tool.download': 'Descargar',
     'tool.github': 'Ver en GitHub',
     'tool.lang_label': 'lenguaje',
+    'lab.kicker': 'lab',
+    'lab.title': 'Lab interactivo',
+    'lab.intro': 'Mini-herramientas de ciber que corren en tu navegador. Nada se envía a ningún servidor.',
+    'lab.link': 'Abrir el lab interactivo',
 
     'contact.kicker': 'contacto',
     'contact.title': 'Hablemos',
@@ -233,6 +237,10 @@ const ui = {
     'tool.download': 'Download',
     'tool.github': 'View on GitHub',
     'tool.lang_label': 'language',
+    'lab.kicker': 'lab',
+    'lab.title': 'Interactive lab',
+    'lab.intro': 'Cyber mini-tools that run in your browser. Nothing is sent to any server.',
+    'lab.link': 'Open the interactive lab',
 
     'contact.kicker': 'contact',
     'contact.title': "Let's talk",

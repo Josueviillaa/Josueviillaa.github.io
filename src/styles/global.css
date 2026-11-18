@@ -165,6 +165,69 @@
 }
 .link:hover { text-decoration-color: var(--accent); }
 
+/* ==========================================================================
+   Lab interactivo (mini-herramientas client-side)
+   ========================================================================== */
+.lab-field {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  padding: 0.6rem 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text);
+  resize: vertical;
+}
+.lab-field::placeholder { color: var(--text-faint); }
+.lab-field:focus-visible { border-color: var(--accent); outline: none; }
+.lab-field-out { background: var(--surface-raised); color: var(--text-muted); }
+
+.lab-btn {
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.lab-btn:hover { border-color: var(--line-strong); color: var(--text); }
+.lab-btn-accent {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: var(--accent-soft);
+}
+.lab-pre {
+  margin: 0;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  padding: 0.6rem 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+/* Barra de fuerza (entropía) */
+.lab-meter {
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.lab-meter > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
 /* Dot "online" */
 .status-dot {
   position: relative;

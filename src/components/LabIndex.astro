@@ -1,0 +1,40 @@
+---
+import TermWindow from './lab/TermWindow.astro';
+import Encoder from './lab/Encoder.astro';
+import JwtTool from './lab/JwtTool.astro';
+import EntropyMeter from './lab/EntropyMeter.astro';
+import HashTool from './lab/HashTool.astro';
+import Icon from './Icon.astro';
+import { withBase } from '../lib/url';
+import { getLang, useT } from '../i18n';
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+const backHref = withBase(lang === 'en' ? '/en/herramientas/' : '/herramientas/');
+---
+
+<section class="wrap pt-10 pb-20 sm:pt-12 sm:pb-24">
+  <a
+    href={backHref}
+    class="inline-flex items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-accent"
+  >
+    <Icon name="arrow-left" size={14} /> {t('tools.kicker')}
+  </a>
+
+  <header class="mt-8 flex flex-col gap-3 border-b border-line pb-10">
+    <p class="flex items-center gap-3 font-mono text-xs text-faint">
+      <span class="font-medium text-accent">$</span>
+      <span class="h-px w-8 bg-line-strong" aria-hidden="true"></span>
+      <span>{t('lab.kicker')}</span>
+    </p>
+    <h1 class="text-4xl font-bold sm:text-5xl">{t('lab.title')}</h1>
+    <p class="max-w-2xl text-muted">{t('lab.intro')}</p>
+  </header>
+
+  <div class="mt-10 grid items-start gap-5 lg:grid-cols-2">
+    <TermWindow title="base64.sh" meta="encode · decode"><Encoder /></TermWindow>
+    <TermWindow title="jwt.decode"><JwtTool /></TermWindow>
+    <TermWindow title="entropy.calc"><EntropyMeter /></TermWindow>
+    <TermWindow title="hashcat.run"><HashTool /></TermWindow>
+  </div>
+</section>

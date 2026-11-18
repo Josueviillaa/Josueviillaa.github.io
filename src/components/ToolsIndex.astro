@@ -2,6 +2,7 @@
 import ToolCard from './ToolCard.astro';
 import Icon from './Icon.astro';
 import { getTools } from '../lib/tools';
+import { withBase } from '../lib/url';
 import { getLang, homeHref, useT } from '../i18n';
 
 const lang = getLang(Astro.url);
@@ -34,6 +35,15 @@ const countWord = tools.length === 1 ? t('tools.count_one') : t('tools.count_man
     <h1 class="text-4xl font-bold sm:text-5xl">{t('tools.title')}</h1>
     <p class="max-w-2xl text-muted">{t('tools.intro')}</p>
   </header>
+
+  <a
+    href={withBase(lang === 'en' ? '/en/herramientas/lab/' : '/herramientas/lab/')}
+    class="group mt-8 flex items-center gap-3 rounded-lg border border-accent/40 bg-accent-soft px-5 py-4 font-mono text-sm text-accent transition-colors hover:border-accent"
+  >
+    <span aria-hidden="true">$</span>
+    <span>{t('lab.link')}</span>
+    <Icon name="arrow-right" size={16} class="ml-auto transition-transform group-hover:translate-x-0.5" />
+  </a>
 
   {
     tools.length ? (

@@ -1,0 +1,148 @@
+---
+import { getLang } from '../../i18n';
+const lang = getLang(Astro.url);
+const L =
+  lang === 'en'
+    ? { ph: 'paste a hash (md5, sha1, sha256, sha512)', likely: 'likely type', crack: 'crack', cracking: 'cracking…', notfound: 'not found in the wordlist', unsupported: 'type not supported for cracking here', unknown: 'unrecognised format', note: 'Dictionary attack against common passwords, running in your browser.' }
+    : { ph: 'pega un hash (md5, sha1, sha256, sha512)', likely: 'tipo probable', crack: 'crackear', cracking: 'crackeando…', notfound: 'no está en la wordlist', unsupported: 'tipo no soportado para crackear aquí', unknown: 'formato no reconocido', note: 'Ataque de diccionario contra contraseñas comunes, en tu navegador.' };
+---
+
+<div
+  data-hash
+  data-crack={L.crack}
+  data-cracking={L.cracking}
+  data-notfound={L.notfound}
+  data-unsupported={L.unsupported}
+  data-unknown={L.unknown}
+  class="space-y-3"
+>
+  <input data-hash-in type="text" placeholder={L.ph} class="lab-field" spellcheck="false" autocomplete="off" />
+  <div class="flex flex-wrap items-center gap-3">
+    <p class="font-mono text-xs">
+      <span class="text-faint">{L.likely}:</span> <span data-hash-id class="text-text">—</span>
+    </p>
+    <button data-hash-crack type="button" class="lab-btn lab-btn-accent ml-auto" disabled>{L.crack}</button>
+  </div>
+  <p data-hash-result class="font-mono text-sm"></p>
+  <p class="font-mono text-[0.6875rem] text-faint"><span class="text-accent">#</span> {L.note}</p>
+</div>
+
+<script>
+  // --- MD5 (Paul Johnston, dominio público) ---------------------------------
+  function md5(str: string): string {
+    function rol(v: number, s: number) { return (v << s) | (v >>> (32 - s)); }
+    function add(x: number, y: number) {
+      const l = (x & 0xffff) + (y & 0xffff);
+      const m = (x >> 16) + (y >> 16) + (l >> 16);
+      return (m << 16) | (l & 0xffff);
+    }
+    function cmn(q: number, a: number, b: number, x: number, s: number, t: number) {
+      return add(rol(add(add(a, q), add(x, t)), s), b);
+    }
+    const FF = (a: number, b: number, c: number, d: number, x: number, s: number, t: number) => cmn((b & c) | (~b & d), a, b, x, s, t);
+    const GG = (a: number, b: number, c: number, d: number, x: number, s: number, t: number) => cmn((b & d) | (c & ~d), a, b, x, s, t);
+    const HH = (a: number, b: number, c: number, d: number, x: number, s: number, t: number) => cmn(b ^ c ^ d, a, b, x, s, t);
+    const II = (a: number, b: number, c: number, d: number, x: number, s: number, t: number) => cmn(c ^ (b | ~d), a, b, x, s, t);
+
+    const utf8 = unescape(encodeURIComponent(str));
+    const n = utf8.length;
+    const words: number[] = [];
+    for (let i = 0; i < n; i++) words[i >> 2] = (words[i >> 2] || 0) | (utf8.charCodeAt(i) << ((i % 4) * 8));
+    words[n >> 2] = (words[n >> 2] || 0) | (0x80 << ((n % 4) * 8));
+    const nBlk = (((n + 8) >> 6) + 1) * 16;
+    while (words.length < nBlk) words.push(0);
+    words[nBlk - 2] = n * 8;
+
+    let a = 1732584193, b = -271733879, c = -1732584194, d = 271733878;
+    for (let i = 0; i < words.length; i += 16) {
+      const oa = a, ob = b, oc = c, od = d;
+      a = FF(a, b, c, d, words[i], 7, -680876936); d = FF(d, a, b, c, words[i + 1], 12, -389564586); c = FF(c, d, a, b, words[i + 2], 17, 606105819); b = FF(b, c, d, a, words[i + 3], 22, -1044525330);
+      a = FF(a, b, c, d, words[i + 4], 7, -176418897); d = FF(d, a, b, c, words[i + 5], 12, 1200080426); c = FF(c, d, a, b, words[i + 6], 17, -1473231341); b = FF(b, c, d, a, words[i + 7], 22, -45705983);
+      a = FF(a, b, c, d, words[i + 8], 7, 1770035416); d = FF(d, a, b, c, words[i + 9], 12, -1958414417); c = FF(c, d, a, b, words[i + 10], 17, -42063); b = FF(b, c, d, a, words[i + 11], 22, -1990404162);
+      a = FF(a, b, c, d, words[i + 12], 7, 1804603682); d = FF(d, a, b, c, words[i + 13], 12, -40341101); c = FF(c, d, a, b, words[i + 14], 17, -1502002290); b = FF(b, c, d, a, words[i + 15], 22, 1236535329);
+      a = GG(a, b, c, d, words[i + 1], 5, -165796510); d = GG(d, a, b, c, words[i + 6], 9, -1069501632); c = GG(c, d, a, b, words[i + 11], 14, 643717713); b = GG(b, c, d, a, words[i], 20, -373897302);
+      a = GG(a, b, c, d, words[i + 5], 5, -701558691); d = GG(d, a, b, c, words[i + 10], 9, 38016083); c = GG(c, d, a, b, words[i + 15], 14, -660478335); b = GG(b, c, d, a, words[i + 4], 20, -405537848);
+      a = GG(a, b, c, d, words[i + 9], 5, 568446438); d = GG(d, a, b, c, words[i + 14], 9, -1019803690); c = GG(c, d, a, b, words[i + 3], 14, -187363961); b = GG(b, c, d, a, words[i + 8], 20, 1163531501);
+      a = GG(a, b, c, d, words[i + 13], 5, -1444681467); d = GG(d, a, b, c, words[i + 2], 9, -51403784); c = GG(c, d, a, b, words[i + 7], 14, 1735328473); b = GG(b, c, d, a, words[i + 12], 20, -1926607734);
+      a = HH(a, b, c, d, words[i + 5], 4, -378558); d = HH(d, a, b, c, words[i + 8], 11, -2022574463); c = HH(c, d, a, b, words[i + 11], 16, 1839030562); b = HH(b, c, d, a, words[i + 14], 23, -35309556);
+      a = HH(a, b, c, d, words[i + 1], 4, -1530992060); d = HH(d, a, b, c, words[i + 4], 11, 1272893353); c = HH(c, d, a, b, words[i + 7], 16, -155497632); b = HH(b, c, d, a, words[i + 10], 23, -1094730640);
+      a = HH(a, b, c, d, words[i + 13], 4, 681279174); d = HH(d, a, b, c, words[i], 11, -358537222); c = HH(c, d, a, b, words[i + 3], 16, -722521979); b = HH(b, c, d, a, words[i + 6], 23, 76029189);
+      a = HH(a, b, c, d, words[i + 9], 4, -640364487); d = HH(d, a, b, c, words[i + 12], 11, -421815835); c = HH(c, d, a, b, words[i + 15], 16, 530742520); b = HH(b, c, d, a, words[i + 2], 23, -995338651);
+      a = II(a, b, c, d, words[i], 6, -198630844); d = II(d, a, b, c, words[i + 7], 10, 1126891415); c = II(c, d, a, b, words[i + 14], 15, -1416354905); b = II(b, c, d, a, words[i + 5], 21, -57434055);
+      a = II(a, b, c, d, words[i + 12], 6, 1700485571); d = II(d, a, b, c, words[i + 3], 10, -1894986606); c = II(c, d, a, b, words[i + 10], 15, -1051523); b = II(b, c, d, a, words[i + 1], 21, -2054922799);
+      a = II(a, b, c, d, words[i + 8], 6, 1873313359); d = II(d, a, b, c, words[i + 15], 10, -30611744); c = II(c, d, a, b, words[i + 6], 15, -1560198380); b = II(b, c, d, a, words[i + 13], 21, 1309151649);
+      a = II(a, b, c, d, words[i + 4], 6, -145523070); d = II(d, a, b, c, words[i + 11], 10, -1120210379); c = II(c, d, a, b, words[i + 2], 15, 718787259); b = II(b, c, d, a, words[i + 9], 21, -343485551);
+      a = add(a, oa); b = add(b, ob); c = add(c, oc); d = add(d, od);
+    }
+    const hex = (num: number) => {
+      let s = '';
+      for (let j = 0; j < 4; j++) s += ((num >> (j * 8)) & 0xff).toString(16).padStart(2, '0');
+      return s;
+    };
+    return hex(a) + hex(b) + hex(c) + hex(d);
+  }
+
+  async function shaHex(algo: string, str: string): Promise<string> {
+    const buf = await crypto.subtle.digest(algo, new TextEncoder().encode(str));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Diccionario de contraseñas comunes (demo client-side)
+  const WORDLIST = ['123456','password','12345678','qwerty','123456789','12345','1234','111111','1234567','dragon','123123','baseball','abc123','football','monkey','letmein','696969','shadow','master','666666','qwertyuiop','123321','mustang','1234567890','michael','654321','superman','1qaz2wsx','7777777','121212','000000','qazwsx','123qwe','killer','trustno1','jordan','jennifer','zxcvbnm','asdfgh','hunter','buster','soccer','harley','batman','andrew','tigger','sunshine','iloveyou','2000','charlie','robert','thomas','hockey','ranger','daniel','starwars','klaster','112233','george','computer','michelle','jessica','pepper','1111','zxcvbn','555555','11111111','131313','freedom','777777','pass','maggie','159753','aaaaaa','ginger','princess','joshua','cheese','amanda','summer','love','ashley','nicole','chelsea','biteme','matthew','access','yankees','987654321','dallas','austin','thunder','taylor','matrix','mobilemail','mom','monitor','monitoring','montana','moon','moscow','admin','root','toor','welcome','login','guest','changeme','secret','passw0rd','p@ssw0rd','test','test123','hello','whatever','blink182','hackthebox','htb','kali','administrator','server','oracle','cisco','linux','ubuntu','debian','nginx','apache','mysql','redhat','azerty','trinity','neo','god','sex','money','internet','service','Password1','Welcome1','P@ssword','abc','qwerty123'];
+
+  const root = document.querySelector('[data-hash]') as HTMLElement | null;
+  if (root) {
+    const inp = root.querySelector('[data-hash-in]') as HTMLInputElement;
+    const idEl = root.querySelector('[data-hash-id]') as HTMLElement;
+    const btn = root.querySelector('[data-hash-crack]') as HTMLButtonElement;
+    const res = root.querySelector('[data-hash-result]') as HTMLElement;
+    const d = root.dataset;
+
+    // nombre legible -> algoritmo crackeable (o null)
+    function detect(h: string): { label: string; algo: string | null } {
+      const v = h.trim();
+      if (/^\$2[aby]\$/.test(v)) return { label: 'bcrypt', algo: null };
+      if (/^\$6\$/.test(v)) return { label: 'sha512crypt', algo: null };
+      if (/^\$1\$/.test(v)) return { label: 'md5crypt', algo: null };
+      if (!/^[0-9a-fA-F]+$/.test(v)) return { label: d.unknown || '?', algo: null };
+      switch (v.length) {
+        case 32: return { label: 'MD5 / NTLM', algo: 'md5' };
+        case 40: return { label: 'SHA-1', algo: 'SHA-1' };
+        case 56: return { label: 'SHA-224', algo: null };
+        case 64: return { label: 'SHA-256', algo: 'SHA-256' };
+        case 96: return { label: 'SHA-384', algo: 'SHA-384' };
+        case 128: return { label: 'SHA-512', algo: 'SHA-512' };
+        default: return { label: d.unknown || '?', algo: null };
+      }
+    }
+
+    async function hashWith(algo: string, word: string): Promise<string> {
+      return algo === 'md5' ? md5(word) : shaHex(algo, word);
+    }
+
+    function refresh() {
+      const v = inp.value.trim();
+      if (!v) { idEl.textContent = '—'; btn.disabled = true; res.textContent = ''; return; }
+      const det = detect(v);
+      idEl.textContent = det.label;
+      btn.disabled = !det.algo;
+    }
+
+    inp.addEventListener('input', refresh);
+
+    btn.addEventListener('click', async () => {
+      const v = inp.value.trim().toLowerCase();
+      const det = detect(v);
+      if (!det.algo) { res.innerHTML = `<span style="color:var(--warn)">${d.unsupported}</span>`; return; }
+      btn.disabled = true;
+      res.innerHTML = `<span class="text-faint">${d.cracking}</span>`;
+      let found: string | null = null;
+      for (const w of WORDLIST) {
+        if ((await hashWith(det.algo, w)) === v) { found = w; break; }
+      }
+      btn.disabled = false;
+      if (found) res.innerHTML = `<span style="color:var(--accent)">CRACKED</span> → <span class="text-text">${found}</span>`;
+      else res.innerHTML = `<span style="color:var(--crit)">✗</span> <span class="text-muted">${d.notfound} (${WORDLIST.length})</span>`;
+    });
+  }
+</script>
