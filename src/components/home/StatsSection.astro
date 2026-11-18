@@ -1,0 +1,54 @@
+---
+import SectionHeader from '../SectionHeader.astro';
+import StatBars from '../StatBars.astro';
+import Icon from '../Icon.astro';
+import { getStats } from '../../lib/stats';
+import { withBase } from '../../lib/url';
+import { getLang, useT } from '../../i18n';
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+const stats = await getStats();
+const href = withBase(lang === 'en' ? '/en/stats/' : '/stats/');
+
+const tiles = [
+  { n: stats.machines, label: t('stats.solved') },
+  { n: stats.writeupsCount, label: t('stats.documented') },
+  { n: stats.techniquesCount, label: t('stats.techniques') },
+  { n: stats.cveCount, label: t('stats.cves') },
+];
+const charts = [
+  { title: t('stats.byOS'), rows: stats.osData },
+  { title: t('stats.byDifficulty'), rows: stats.diffData },
+  { title: t('stats.topTech'), rows: stats.topTags },
+];
+---
+
+<section id="estadisticas" class="border-b border-line">
+  <div class="wrap py-20 sm:py-24">
+    <SectionHeader n="05" label={t('stats.kicker')} title={t('stats.title')} intro={t('stats.intro')} />
+
+    <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      {
+        tiles.map((tile) => (
+          <div class="rounded-lg border border-line bg-surface p-5">
+            <p class="font-display text-4xl font-bold text-text">{tile.n}</p>
+            <p class="mt-1 font-mono text-xs text-faint">{tile.label}</p>
+          </div>
+        ))
+      }
+    </div>
+
+    <div class="mt-5 grid gap-4 md:grid-cols-3">
+      {charts.map((chart) => <StatBars title={chart.title} rows={chart.rows} />)}
+    </div>
+
+    <a
+      href={href}
+      class="group mt-8 inline-flex items-center gap-2 font-mono text-[0.8125rem] text-muted transition-colors hover:text-accent"
+    >
+      {t('stats.link')}
+      <Icon name="arrow-right" size={14} class="transition-transform group-hover:translate-x-0.5" />
+    </a>
+  </div>
+</section>

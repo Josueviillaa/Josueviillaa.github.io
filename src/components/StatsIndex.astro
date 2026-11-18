@@ -1,48 +1,33 @@
 ---
 import Icon from './Icon.astro';
+import StatBars from './StatBars.astro';
 import { getWriteups } from '../lib/writeups';
+import { getStats } from '../lib/stats';
 import { attack } from '../data/attack';
-import { site } from '../config/site';
 import { withBase } from '../lib/url';
 import { getLang, useT, homeHref } from '../i18n';
 
 const lang = getLang(Astro.url);
 const t = useT(lang);
 
+const stats = await getStats();
 const writeups = await getWriteups();
 const wmap = Object.fromEntries(
   writeups.map((w) => [w.id, { title: w.data.title, href: withBase(`/writeups/${w.id}/`) }]),
 ) as Record<string, { title: string; href: string }>;
 
-const osFamily = (os: string) => (os.toLowerCase().startsWith('windows') ? 'Windows' : 'Linux');
-const tally = (arr: string[]) => arr.reduce<Record<string, number>>((m, k) => ((m[k] = (m[k] || 0) + 1), m), {});
-
-const osData = tally(writeups.map((w) => osFamily(w.data.os)));
-const diffOrder = ['Easy', 'Medium', 'Hard', 'Insane'];
-const diffCount = tally(writeups.map((w) => w.data.difficulty));
-const diffData = diffOrder.filter((d) => diffCount[d]).map((d) => [d, diffCount[d]] as [string, number]);
-
-const allTags = writeups.flatMap((w) => w.data.tags.map((x) => x.toLowerCase().trim()));
-const techniquesCount = new Set(allTags).size;
-const cves = [...new Set(allTags.filter((x) => /^cve-/.test(x)))];
-const noise = new Set(['linux', 'windows']);
-const tagCounts = tally(allTags.filter((x) => !noise.has(x) && !/^cve-/.test(x)));
-const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
-
 const tiles = [
-  { n: site.htb.machines, label: t('stats.solved') },
-  { n: writeups.length, label: t('stats.documented') },
-  { n: techniquesCount, label: t('stats.techniques') },
-  { n: cves.length, label: t('stats.cves') },
+  { n: stats.machines, label: t('stats.solved') },
+  { n: stats.writeupsCount, label: t('stats.documented') },
+  { n: stats.techniquesCount, label: t('stats.techniques') },
+  { n: stats.cveCount, label: t('stats.cves') },
 ];
 
-type Bars = { title: string; rows: [string, number][] };
-const charts: Bars[] = [
-  { title: t('stats.byOS'), rows: Object.entries(osData).sort((a, b) => b[1] - a[1]) },
-  { title: t('stats.byDifficulty'), rows: diffData },
-  { title: t('stats.topTech'), rows: topTags },
+const charts = [
+  { title: t('stats.byOS'), rows: stats.osData },
+  { title: t('stats.byDifficulty'), rows: stats.diffData },
+  { title: t('stats.topTech'), rows: stats.topTags },
 ];
-const maxOf = (rows: [string, number][]) => Math.max(1, ...rows.map((r) => r[1]));
 ---
 
 <section class="wrap pt-10 pb-20 sm:pt-12 sm:pb-24">
@@ -63,7 +48,6 @@ const maxOf = (rows: [string, number][]) => Math.max(1, ...rows.map((r) => r[1])
     <p class="max-w-2xl text-muted">{t('stats.intro')}</p>
   </header>
 
-  <!-- Tiles -->
   <div class="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
     {
       tiles.map((tile) => (
@@ -75,32 +59,10 @@ const maxOf = (rows: [string, number][]) => Math.max(1, ...rows.map((r) => r[1])
     }
   </div>
 
-  <!-- Barras -->
   <div class="mt-5 grid gap-4 md:grid-cols-3">
-    {
-      charts.map((chart) => {
-        const max = maxOf(chart.rows);
-        return (
-          <div class="rounded-lg border border-line bg-surface p-5">
-            <p class="font-mono text-xs text-faint">{chart.title}</p>
-            <div class="mt-4 space-y-2.5">
-              {chart.rows.map(([label, n]) => (
-                <div class="flex items-center gap-3 font-mono text-xs">
-                  <span class="w-24 shrink-0 truncate text-muted">{label}</span>
-                  <span class="h-2 flex-1 overflow-hidden rounded-full bg-line">
-                    <span class="block h-full rounded-full bg-accent" style={`width:${(n / max) * 100}%`} />
-                  </span>
-                  <span class="w-5 shrink-0 text-right text-faint">{n}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })
-    }
+    {charts.map((chart) => <StatBars title={chart.title} rows={chart.rows} />)}
   </div>
 
-  <!-- Matriz ATT&CK -->
   <header class="mt-16 flex flex-col gap-2 border-b border-line pb-6">
     <h2 class="text-2xl font-semibold sm:text-3xl">{t('stats.attack')}</h2>
     <p class="max-w-2xl text-sm text-muted">{t('stats.attackNote')}</p>

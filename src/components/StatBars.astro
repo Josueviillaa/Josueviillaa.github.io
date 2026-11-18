@@ -1,0 +1,27 @@
+---
+import type { Row } from '../lib/stats';
+
+interface Props {
+  title: string;
+  rows: Row[];
+}
+const { title, rows } = Astro.props;
+const max = Math.max(1, ...rows.map((r) => r[1]));
+---
+
+<div class="rounded-lg border border-line bg-surface p-5">
+  <p class="font-mono text-xs text-faint">{title}</p>
+  <div class="mt-4 space-y-2.5">
+    {
+      rows.map(([label, n]) => (
+        <div class="flex items-center gap-3 font-mono text-xs">
+          <span class="w-24 shrink-0 truncate text-muted">{label}</span>
+          <span class="h-2 flex-1 overflow-hidden rounded-full bg-line">
+            <span class="block h-full rounded-full bg-accent" style={`width:${(n / max) * 100}%`} />
+          </span>
+          <span class="w-5 shrink-0 text-right text-faint">{n}</span>
+        </div>
+      ))
+    }
+  </div>
+</div>
