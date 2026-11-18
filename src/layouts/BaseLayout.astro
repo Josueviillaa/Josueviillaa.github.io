@@ -135,6 +135,7 @@ const personLd = {
 
   <body id="top">
     <BootIntro />
+    <div id="read-progress" aria-hidden="true" class="pointer-events-none fixed top-0 left-0 z-[60] h-0.5 w-full origin-left bg-accent"></div>
     <a
       href="#main"
       class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-md focus:bg-accent focus:px-3 focus:py-2 focus:font-mono focus:text-sm focus:text-accent-ink"
@@ -239,6 +240,63 @@ const personLd = {
           if (e.key === 'Escape') closeAll(null);
         });
       })();
+    </script>
+
+    <script>
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (!reduce && 'IntersectionObserver' in window) {
+        const io = new IntersectionObserver(
+          (ents, obs) => {
+            ents.forEach((e) => {
+              if (e.isIntersecting) {
+                e.target.classList.add('reveal-in');
+                obs.unobserve(e.target);
+              }
+            });
+          },
+          { threshold: 0.08, rootMargin: '0px 0px -8% 0px' },
+        );
+        document.querySelectorAll<HTMLElement>('main section, main article').forEach((el) => {
+          if (el.getBoundingClientRect().top < window.innerHeight * 0.88) el.classList.add('reveal-in');
+          else {
+            el.classList.add('reveal');
+            io.observe(el);
+          }
+        });
+        window.setTimeout(() => {
+          document.querySelectorAll('.reveal:not(.reveal-in)').forEach((el) => el.classList.add('reveal-in'));
+        }, 2500);
+      }
+
+      document.querySelectorAll<HTMLPreElement>('.writeup pre').forEach((pre) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'code-copy';
+        btn.textContent = 'copy';
+        btn.setAttribute('aria-label', 'Copiar código');
+        btn.addEventListener('click', async () => {
+          const code = (pre.querySelector('code') || pre).textContent || '';
+          try {
+            await navigator.clipboard.writeText(code);
+            btn.textContent = 'copied';
+            window.setTimeout(() => (btn.textContent = 'copy'), 1500);
+          } catch {}
+        });
+        pre.appendChild(btn);
+      });
+
+      const bar = document.getElementById('read-progress');
+      if (bar) {
+        const update = () => {
+          const h = document.documentElement;
+          const max = h.scrollHeight - h.clientHeight;
+          bar.style.transform = `scaleX(${max > 0 ? Math.min(1, h.scrollTop / max) : 0})`;
+        };
+        window.addEventListener('scroll', update, { passive: true });
+        window.addEventListener('resize', update);
+        update();
+      }
     </script>
   </body>
 </html>
