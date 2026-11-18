@@ -3,6 +3,7 @@ import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import PrivacyNotice from '../components/PrivacyNotice.astro';
 import CommandPalette from '../components/CommandPalette.astro';
+import Shortcuts from '../components/Shortcuts.astro';
 import MatrixRain from '../components/MatrixRain.astro';
 import BootIntro from '../components/BootIntro.astro';
 import { site, content, githubUrl, linkedinUrl, htbUrl } from '../config/site';
@@ -169,6 +170,7 @@ const personLd = {
 
     <PrivacyNotice />
     <CommandPalette />
+    <Shortcuts />
     <MatrixRain />
 
     <div
@@ -284,6 +286,15 @@ const personLd = {
           } catch {}
         });
         pre.appendChild(btn);
+      });
+
+      document.querySelectorAll<HTMLElement>('.writeup h2[id], .writeup h3[id]').forEach((h) => {
+        const a = document.createElement('a');
+        a.href = '#' + h.id;
+        a.className = 'heading-anchor';
+        a.textContent = '#';
+        a.setAttribute('aria-label', 'Enlace a esta sección');
+        h.appendChild(a);
       });
 
       const bar = document.getElementById('read-progress');

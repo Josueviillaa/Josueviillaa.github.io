@@ -1,0 +1,72 @@
+---
+import { getLang } from '../i18n';
+
+const lang = getLang(Astro.url);
+const L =
+  lang === 'en'
+    ? {
+        title: 'shortcuts',
+        close: 'esc to close',
+        rows: [
+          ['Ctrl / ⌘ + K', 'search & navigate'],
+          ['terminal', 'type help on the home'],
+          ['matrix · crt', 'effects (in the footer)'],
+          ['↑↑↓↓←→←→ B A', '?!'],
+          ['?', 'this help'],
+        ],
+      }
+    : {
+        title: 'atajos',
+        close: 'esc para cerrar',
+        rows: [
+          ['Ctrl / ⌘ + K', 'buscar y navegar'],
+          ['terminal', 'escribe help en el inicio'],
+          ['matrix · crt', 'efectos (en el pie)'],
+          ['↑↑↓↓←→←→ B A', '¿?'],
+          ['?', 'esta ayuda'],
+        ],
+      };
+---
+
+<div
+  data-shortcuts
+  hidden
+  class="fixed inset-0 z-[110] flex items-center justify-center bg-bg/70 px-4 backdrop-blur-sm"
+>
+  <div role="dialog" aria-modal="true" aria-label={L.title} class="w-full max-w-sm rounded-lg border border-line bg-surface p-5 shadow-2xl">
+    <p class="mb-4 font-mono text-xs text-faint"><span class="text-accent">?</span> {L.title}</p>
+    <dl class="space-y-2.5">
+      {
+        L.rows.map(([k, d]) => (
+          <div class="flex items-center justify-between gap-4">
+            <dd class="font-mono text-sm text-muted">{d}</dd>
+            <dt class="kbd">{k}</dt>
+          </div>
+        ))
+      }
+    </dl>
+    <p class="mt-5 font-mono text-[0.6875rem] text-faint">{L.close}</p>
+  </div>
+</div>
+
+<script>
+  const overlay = document.querySelector<HTMLElement>('[data-shortcuts]');
+  if (overlay) {
+    const open = () => (overlay.hidden = false);
+    const close = () => (overlay.hidden = true);
+    const typing = (el: EventTarget | null) =>
+      el instanceof HTMLElement && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '?' && !typing(e.target)) {
+        e.preventDefault();
+        overlay.hidden ? open() : close();
+      } else if (e.key === 'Escape' && !overlay.hidden) {
+        close();
+      }
+    });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+  }
+</script>

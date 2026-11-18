@@ -122,7 +122,7 @@ const L =
       </span>
       {cfg.user}: ~
     </span>
-    <span>zsh</span>
+    <span data-term-clock class="tabular-nums">zsh</span>
   </div>
 
   <div class="space-y-1 p-5 font-mono text-[0.8125rem] leading-7">
@@ -328,5 +328,12 @@ const L =
     root.addEventListener('click', (e) => {
       if (e.target instanceof Element && !e.target.closest('a')) input.focus();
     });
+
+    const clock = root.querySelector('[data-term-clock]');
+    if (clock) {
+      const tick = () => (clock.textContent = new Date().toLocaleTimeString());
+      tick();
+      setInterval(tick, 1000);
+    }
   })();
 </script>

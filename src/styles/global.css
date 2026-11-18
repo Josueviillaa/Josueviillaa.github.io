@@ -288,6 +288,37 @@
   transform: scaleX(0);
 }
 
+.kbd {
+  border: 1px solid var(--line-strong);
+  border-radius: 0.3rem;
+  padding: 0.05rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text);
+  background: var(--surface-raised);
+  white-space: nowrap;
+}
+
+.writeup h2,
+.writeup h3 {
+  position: relative;
+}
+.heading-anchor {
+  margin-left: 0.4rem;
+  color: var(--text-faint);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.writeup h2:hover .heading-anchor,
+.writeup h3:hover .heading-anchor,
+.heading-anchor:focus-visible {
+  opacity: 1;
+}
+.heading-anchor:hover {
+  color: var(--accent);
+}
+
 /* Dot "online" */
 .status-dot {
   position: relative;
