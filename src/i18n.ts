@@ -131,6 +131,10 @@ const ui = {
     'lab.title': 'Lab interactivo',
     'lab.intro': 'Mini-herramientas de ciber que corren en tu navegador. Nada se envía a ningún servidor.',
     'lab.link': 'Abrir el lab interactivo',
+    'cmdk.placeholder': 'Buscar o ir a… (writeups, notas, secciones)',
+    'cmdk.hint': 'navegar · ↵ abrir · esc cerrar',
+    'cmdk.empty': 'Sin resultados',
+    'cmdk.open': 'Buscar',
 
     'contact.kicker': 'contacto',
     'contact.title': 'Hablemos',
@@ -241,6 +245,10 @@ const ui = {
     'lab.title': 'Interactive lab',
     'lab.intro': 'Cyber mini-tools that run in your browser. Nothing is sent to any server.',
     'lab.link': 'Open the interactive lab',
+    'cmdk.placeholder': 'Search or jump to… (writeups, notes, sections)',
+    'cmdk.hint': 'navigate · ↵ open · esc close',
+    'cmdk.empty': 'No results',
+    'cmdk.open': 'Search',
 
     'contact.kicker': 'contact',
     'contact.title': "Let's talk",

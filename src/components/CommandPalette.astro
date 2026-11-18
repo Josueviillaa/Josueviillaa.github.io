@@ -1,0 +1,179 @@
+---
+/**
+ * Command palette (Ctrl/Cmd+K): overlay global para buscar y navegar por
+ * writeups, notas, herramientas y secciones con búsqueda difusa. Se abre con
+ * Ctrl/Cmd+K, el evento `cmdk:open`, o el botón de búsqueda del nav.
+ */
+import { getWriteups } from '../lib/writeups';
+import { getNotes } from '../lib/notes';
+import { getTools } from '../lib/tools';
+import { withBase } from '../lib/url';
+import { getLang, useT, homeHref } from '../i18n';
+import { githubUrl, linkedinUrl, htbUrl } from '../config/site';
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+const home = homeHref(lang);
+const p = (path: string) => withBase(lang === 'en' ? `/en${path}` : path);
+
+const [writeups, notes, tools] = await Promise.all([getWriteups(), getNotes(), getTools()]);
+
+type Item = { label: string; href: string; kind: string; keywords?: string; external?: boolean };
+
+const items: Item[] = [
+  { label: t('nav.about'), href: `${home}#sobre-mi`, kind: 'nav' },
+  { label: t('nav.skills'), href: `${home}#skills`, kind: 'nav' },
+  { label: t('nav.certs'), href: `${home}#certificaciones`, kind: 'nav' },
+  { label: t('nav.contact'), href: `${home}#contacto`, kind: 'nav' },
+  { label: t('nav.writeups'), href: p('/writeups/'), kind: 'page' },
+  { label: t('nav.notes'), href: p('/notas/'), kind: 'page' },
+  { label: t('nav.tools'), href: p('/herramientas/'), kind: 'page' },
+  { label: t('lab.title'), href: p('/herramientas/lab/'), kind: 'page' },
+  ...writeups.map((e) => ({ label: e.data.title, href: withBase(`/writeups/${e.id}/`), kind: 'writeup', keywords: e.data.tags.join(' ') })),
+  ...notes.map((e) => ({ label: e.data.title, href: withBase(`/notas/${e.id}/`), kind: 'note', keywords: e.data.tags.join(' ') })),
+  ...tools.map((e) => ({ label: e.data.title, href: withBase(`/herramientas/${e.id}/`), kind: 'tool' })),
+  { label: 'GitHub', href: githubUrl, kind: 'link', external: true },
+  { label: 'LinkedIn', href: linkedinUrl, kind: 'link', external: true },
+  { label: 'HackTheBox', href: htbUrl, kind: 'link', external: true },
+];
+
+const kindLabels =
+  lang === 'en'
+    ? { nav: 'section', page: 'page', writeup: 'writeup', note: 'note', tool: 'tool', link: 'link' }
+    : { nav: 'sección', page: 'página', writeup: 'writeup', note: 'nota', tool: 'tool', link: 'link' };
+---
+
+<div
+  data-cmdk
+  hidden
+  class="fixed inset-0 z-[100] flex items-start justify-center bg-bg/70 px-4 pt-[12vh] backdrop-blur-sm"
+>
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-label={t('cmdk.open')}
+    class="w-full max-w-xl overflow-hidden rounded-lg border border-line bg-surface shadow-2xl"
+  >
+    <div class="flex items-center gap-2 border-b border-line px-4">
+      <span class="font-mono text-sm text-accent" aria-hidden="true">&gt;</span>
+      <input
+        data-cmdk-input
+        type="text"
+        role="combobox"
+        aria-expanded="true"
+        aria-controls="cmdk-list"
+        aria-autocomplete="list"
+        placeholder={t('cmdk.placeholder')}
+        class="w-full bg-transparent py-3 font-mono text-sm text-text outline-none placeholder:text-faint"
+        spellcheck="false"
+        autocomplete="off"
+      />
+    </div>
+    <ul data-cmdk-list id="cmdk-list" role="listbox" class="max-h-[50vh] overflow-y-auto py-2"></ul>
+    <p class="border-t border-line px-4 py-2 font-mono text-[0.6875rem] text-faint">
+      <span class="text-muted">↑↓</span> {t('cmdk.hint')}
+    </p>
+  </div>
+</div>
+
+<script type="application/json" data-cmdk-items set:html={JSON.stringify(items)}></script>
+<script is:inline define:vars={{ emptyMsg: t('cmdk.empty'), kindLabel: kindLabels }}>
+  (function () {
+    const overlay = document.querySelector('[data-cmdk]');
+    const input = overlay?.querySelector('[data-cmdk-input]');
+    const list = overlay?.querySelector('[data-cmdk-list]');
+    const dataEl = document.querySelector('[data-cmdk-items]');
+    if (!overlay || !input || !list || !dataEl) return;
+
+    const items = JSON.parse(dataEl.textContent || '[]');
+    let active = 0;
+    let results = [];
+
+    function score(text, q) {
+      text = (text || '').toLowerCase();
+      if (!q) return 1;
+      if (text.startsWith(q)) return 100;
+      const idx = text.indexOf(q);
+      if (idx >= 0) return 60 - idx * 0.1;
+      let ti = 0, qi = 0;
+      while (ti < text.length && qi < q.length) { if (text[ti] === q[qi]) qi++; ti++; }
+      return qi === q.length ? 18 : -1;
+    }
+
+    function render() {
+      const q = input.value.trim().toLowerCase();
+      results = items
+        .map((it) => ({ it, s: Math.max(score(it.label, q), q ? score(it.keywords || '', q) * 0.6 : 0) }))
+        .filter((r) => r.s > 0)
+        .sort((a, b) => b.s - a.s)
+        .slice(0, 25)
+        .map((r) => r.it);
+      active = 0;
+      if (!results.length) {
+        list.innerHTML = `<li class="px-4 py-3 font-mono text-sm text-faint">${emptyMsg}</li>`;
+        return;
+      }
+      list.innerHTML = results
+        .map(
+          (it, i) =>
+            `<li role="option" data-idx="${i}" data-href="${it.href}" data-external="${it.external ? '1' : ''}" ` +
+            `class="cmdk-item flex cursor-pointer items-center gap-3 px-4 py-2 font-mono text-sm ${i === active ? 'bg-raised text-text' : 'text-muted'}">` +
+            `<span class="truncate">${it.label}</span>` +
+            `<span class="ml-auto shrink-0 text-[0.6875rem] text-faint">${kindLabel[it.kind] || it.kind}</span></li>`,
+        )
+        .join('');
+    }
+
+    function paintActive() {
+      list.querySelectorAll('.cmdk-item').forEach((el, i) => {
+        el.classList.toggle('bg-raised', i === active);
+        el.classList.toggle('text-text', i === active);
+        el.classList.toggle('text-muted', i !== active);
+        if (i === active) el.scrollIntoView({ block: 'nearest' });
+      });
+    }
+
+    function go(it) {
+      if (!it) return;
+      close();
+      if (it.external) window.open(it.href, '_blank', 'noopener');
+      else window.location.href = it.href;
+    }
+
+    function open() {
+      overlay.hidden = false;
+      input.value = '';
+      render();
+      setTimeout(() => input.focus(), 0);
+    }
+    function close() {
+      overlay.hidden = true;
+    }
+    function toggle() {
+      overlay.hidden ? open() : close();
+    }
+
+    input.addEventListener('input', render);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, results.length - 1); paintActive(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); paintActive(); }
+      else if (e.key === 'Enter') { e.preventDefault(); go(results[active]); }
+      else if (e.key === 'Escape') { e.preventDefault(); close(); }
+    });
+    list.addEventListener('click', (e) => {
+      const li = e.target instanceof Element ? e.target.closest('.cmdk-item') : null;
+      if (li) go(results[Number(li.getAttribute('data-idx'))]);
+    });
+    list.addEventListener('pointermove', (e) => {
+      const li = e.target instanceof Element ? e.target.closest('.cmdk-item') : null;
+      if (li) { active = Number(li.getAttribute('data-idx')); paintActive(); }
+    });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); toggle(); }
+    });
+    document.addEventListener('cmdk:open', open);
+    document.querySelectorAll('[data-cmdk-open]').forEach((b) => b.addEventListener('click', open));
+  })();
+</script>

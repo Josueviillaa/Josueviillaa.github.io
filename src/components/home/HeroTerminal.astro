@@ -1,0 +1,277 @@
+---
+import { site, content, githubUrl, linkedinUrl, htbUrl } from '../../config/site';
+import { certs } from '../../data/certs';
+import { skills } from '../../data/skills';
+import { getWriteups } from '../../lib/writeups';
+import { withBase } from '../../lib/url';
+import { getLang, useT, homeHref } from '../../i18n';
+
+const lang = getLang(Astro.url);
+const t = useT(lang);
+const c = content[lang];
+const home = homeHref(lang);
+const p = (path: string) => withBase(lang === 'en' ? `/en${path}` : path);
+
+const writeups = await getWriteups();
+const earned = certs.filter((cert) => cert.status === 'obtenida').map((cert) => cert.code);
+const machineWord = writeups.length === 1 ? t('unit.machine_one') : t('unit.machine_many');
+
+const profile: [string, string][] = [
+  [t('hero.role_label'), c.profile.role],
+  [t('hero.education_label'), c.profile.education],
+  [t('hero.certs_label'), earned.length ? earned.join(', ') : '—'],
+  [t('hero.htb_label'), `${site.htb.rank} · ${site.htb.machines} ${t('unit.machine_many')}`],
+  [t('hero.writeups_label'), `${writeups.length} ${machineWord}`],
+];
+
+const cfg = {
+  user: `${site.handle}@kali`,
+  handle: site.handle,
+  name: site.name,
+  role: c.role,
+  about: c.about[0],
+  writeups: writeups.map((w) => ({ title: w.data.title, href: withBase(`/writeups/${w.id}/`) })),
+  skills: skills.map((g) => ({ title: g.title[lang], items: g.items[lang] })),
+  certs: certs.map((cc) => ({ code: cc.code, name: cc.name, status: t(`cert.status.${cc.status}` as 'cert.status.obtenida') })),
+  links: { github: githubUrl, linkedin: linkedinUrl, htb: htbUrl, email: site.email },
+  accents: ['green', 'cyan', 'blue', 'pink', 'red', 'grey'],
+  nav: {
+    writeups: p('/writeups/'),
+    notes: p('/notas/'),
+    tools: p('/herramientas/'),
+    lab: p('/herramientas/lab/'),
+    about: `${home}#sobre-mi`,
+    skills: `${home}#skills`,
+    certs: `${home}#certificaciones`,
+    contact: `${home}#contacto`,
+  },
+};
+
+const L =
+  lang === 'en'
+    ? {
+        hint: 'type <b>help</b> and press enter',
+        notFound: 'command not found: ',
+        help: 'available commands',
+        cv: 'CV (PDF) coming soon. In the meantime, my LinkedIn:',
+        themeUsage: 'usage: theme &lt;green|cyan|blue|pink|red|grey&gt;',
+        themeOk: 'accent changed to ',
+        sudo: "nice try \u{1F60F} — no root for you here",
+        aria: 'Interactive terminal',
+        cmds: [
+          ['help', 'this list'],
+          ['whoami', 'who I am'],
+          ['about', 'about me'],
+          ['skills', 'skills & stack'],
+          ['certs', 'certifications'],
+          ['writeups', 'list HackTheBox write-ups'],
+          ['notes', 'technical notes'],
+          ['tools / lab', 'tools and interactive lab'],
+          ['contact', 'email & socials'],
+          ['theme &lt;color&gt;', 'change accent colour'],
+          ['cv', 'download CV'],
+          ['clear', 'clear the screen'],
+        ],
+      }
+    : {
+        hint: 'escribe <b>help</b> y pulsa enter',
+        notFound: 'comando no encontrado: ',
+        help: 'comandos disponibles',
+        cv: 'CV (PDF): próximamente. Mientras tanto, mi LinkedIn:',
+        themeUsage: 'uso: theme &lt;green|cyan|blue|pink|red|grey&gt;',
+        themeOk: 'acento cambiado a ',
+        sudo: "buen intento \u{1F60F} — aquí no hay root que valga",
+        aria: 'Terminal interactiva',
+        cmds: [
+          ['help', 'esta lista'],
+          ['whoami', 'quién soy'],
+          ['about', 'sobre mí'],
+          ['skills', 'skills y stack'],
+          ['certs', 'certificaciones'],
+          ['writeups', 'listar writeups de HackTheBox'],
+          ['notes', 'notas técnicas'],
+          ['tools / lab', 'herramientas y lab interactivo'],
+          ['contact', 'email y redes'],
+          ['theme &lt;color&gt;', 'cambiar color de acento'],
+          ['cv', 'descargar CV'],
+          ['clear', 'limpiar la pantalla'],
+        ],
+      };
+---
+
+<div
+  class="hero-term min-w-0 overflow-hidden rounded-lg border border-line bg-surface"
+  aria-label={L.aria}
+  data-hero-term
+>
+  <div class="flex items-center justify-between border-b border-line bg-raised px-4 py-2 font-mono text-xs text-faint">
+    <span class="flex items-center gap-2">
+      <span class="flex gap-1.5" aria-hidden="true">
+        <span class="size-2.5 rounded-full bg-crit/70"></span>
+        <span class="size-2.5 rounded-full bg-warn/70"></span>
+        <span class="size-2.5 rounded-full bg-accent/70"></span>
+      </span>
+      {cfg.user}: ~
+    </span>
+    <span>zsh</span>
+  </div>
+
+  <div class="space-y-1 p-5 font-mono text-[0.8125rem] leading-7">
+    <div data-term-log class="max-h-[22rem] space-y-1 overflow-y-auto">
+      <p><span class="text-accent">$</span> <span class="text-text">{t('hero.cmd')}</span></p>
+      <dl class="grid grid-cols-[6.5rem_1fr] gap-x-3 pb-1">
+        {
+          profile.map(([k, v]) => (
+            <>
+              <dt class="text-faint">{k}</dt>
+              <dd class="text-muted">{v}</dd>
+            </>
+          ))
+        }
+      </dl>
+    </div>
+
+    <!-- Línea de entrada (interactiva, la activa el script) -->
+    <form data-term-form class="mt-1 flex items-center gap-2" hidden>
+      <label class="text-accent" for="term-input" aria-hidden="true">$</label>
+      <input
+        id="term-input"
+        data-term-input
+        type="text"
+        class="min-w-0 flex-1 bg-transparent text-text outline-none"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        aria-label={L.aria}
+      />
+    </form>
+    <!-- Prompt estático de fallback (sin JS) -->
+    <p data-term-static><span class="text-accent">$</span><span class="cursor" aria-hidden="true"></span></p>
+  </div>
+</div>
+
+<script is:inline define:vars={{ cfg, L }}>
+  (function () {
+    const root = document.querySelector('[data-hero-term]');
+    if (!root) return;
+    const log = root.querySelector('[data-term-log]');
+    const form = root.querySelector('[data-term-form]');
+    const input = root.querySelector('[data-term-input]');
+    const staticPrompt = root.querySelector('[data-term-static]');
+    if (!log || !form || !input) return;
+
+    // Activa la terminal: oculta el prompt estático, muestra el input.
+    staticPrompt?.remove();
+    form.hidden = false;
+
+    const esc = (s) => s.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
+    function out(html) {
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+    function echoCmd(text) {
+      out(`<p><span class="text-accent">$</span> <span class="text-text">${esc(text)}</span></p>`);
+    }
+    const link = (href, label, ext) =>
+      `<a href="${href}" class="link"${ext ? ' target="_blank" rel="noopener noreferrer"' : ''}>${esc(label)}</a>`;
+
+    out(`<p class="text-faint">${L.hint}</p>`);
+
+    const history = [];
+    let hi = -1;
+
+    function run(raw) {
+      const line = raw.trim();
+      if (!line) return;
+      history.push(line);
+      hi = history.length;
+      echoCmd(line);
+      const [cmd, ...rest] = line.split(/\s+/);
+      const arg = rest.join(' ');
+      switch (cmd.toLowerCase()) {
+        case 'help':
+          out('<p class="text-faint">' + L.help + ':</p>' +
+            '<ul class="ml-1">' + L.cmds.map(([c, d]) => `<li><span class="text-accent">${c}</span> <span class="text-faint">— ${d}</span></li>`).join('') + '</ul>');
+          break;
+        case 'whoami':
+          out(`<p>${esc(cfg.handle)} · <span class="text-muted">${esc(cfg.name)} — ${esc(cfg.role)}</span></p>`);
+          break;
+        case 'about':
+          out(`<p class="text-muted">${esc(cfg.about)}</p><p>→ ${link(cfg.nav.about, 'about', false)}</p>`);
+          break;
+        case 'skills':
+          out(cfg.skills.map((g) => `<p><span class="text-accent">${esc(g.title)}:</span> <span class="text-muted">${esc(g.items.join(', '))}</span></p>`).join(''));
+          break;
+        case 'certs':
+          out(cfg.certs.map((c) => `<p><span class="text-text">${esc(c.code)}</span> <span class="text-faint">— ${esc(c.name)} [${esc(c.status)}]</span></p>`).join(''));
+          break;
+        case 'writeups':
+        case 'ls':
+          out('<ul class="ml-1">' + cfg.writeups.map((w) => `<li>${link(w.href, w.title, false)}</li>`).join('') + '</ul>');
+          break;
+        case 'notes':
+        case 'notas':
+          out(`<p>→ ${link(cfg.nav.notes, 'notas', false)}</p>`);
+          break;
+        case 'tools':
+        case 'herramientas':
+          out(`<p>→ ${link(cfg.nav.tools, 'herramientas', false)} · ${link(cfg.nav.lab, 'lab', false)}</p>`);
+          break;
+        case 'lab':
+          window.location.href = cfg.nav.lab;
+          break;
+        case 'contact':
+        case 'contacto':
+          out(`<p>${link('mailto:' + cfg.links.email, cfg.links.email, false)}</p>` +
+            `<p>${link(cfg.links.github, 'github', true)} · ${link(cfg.links.linkedin, 'linkedin', true)} · ${link(cfg.links.htb, 'hackthebox', true)}</p>`);
+          break;
+        case 'github': window.open(cfg.links.github, '_blank', 'noopener'); break;
+        case 'linkedin': window.open(cfg.links.linkedin, '_blank', 'noopener'); break;
+        case 'htb': window.open(cfg.links.htb, '_blank', 'noopener'); break;
+        case 'theme':
+          if (cfg.accents.includes(arg)) {
+            document.documentElement.dataset.accent = arg;
+            try { localStorage.setItem('accent', arg); } catch {}
+            out(`<p class="text-faint">${L.themeOk}<span class="text-accent">${esc(arg)}</span></p>`);
+          } else out(`<p class="text-faint">${L.themeUsage}</p>`);
+          break;
+        case 'cv':
+          out(`<p class="text-faint">${L.cv} ${link(cfg.links.linkedin, 'linkedin', true)}</p>`);
+          break;
+        case 'banner':
+          out(`<pre class="text-accent">~/${esc(cfg.handle)}</pre>`);
+          break;
+        case 'echo':
+          out(`<p class="text-muted">${esc(arg)}</p>`);
+          break;
+        case 'date':
+          out(`<p class="text-muted">${new Date().toString()}</p>`);
+          break;
+        case 'clear':
+          log.innerHTML = '';
+          break;
+        case 'sudo':
+          out(`<p class="text-warn">${L.sudo}</p>`);
+          break;
+        default:
+          out(`<p class="text-crit">${L.notFound}${esc(cmd)}</p>`);
+      }
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      run(input.value);
+      input.value = '';
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp') { e.preventDefault(); if (hi > 0) { hi--; input.value = history[hi] || ''; } }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); if (hi < history.length) { hi++; input.value = history[hi] || ''; } }
+    });
+    // Enfocar al hacer clic en el cuerpo de la terminal (no en un enlace).
+    root.addEventListener('click', (e) => {
+      if (e.target instanceof Element && !e.target.closest('a')) input.focus();
+    });
+  })();
+</script>

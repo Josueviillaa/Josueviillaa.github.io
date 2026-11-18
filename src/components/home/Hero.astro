@@ -1,27 +1,12 @@
 ---
 import Icon from '../Icon.astro';
 import CopyEmail from '../CopyEmail.astro';
+import HeroTerminal from './HeroTerminal.astro';
 import { site, content, githubUrl, linkedinUrl, htbUrl } from '../../config/site';
-import { certs } from '../../data/certs';
-import { getWriteups } from '../../lib/writeups';
-import { getLang, useT } from '../../i18n';
+import { getLang } from '../../i18n';
 
 const lang = getLang(Astro.url);
-const t = useT(lang);
 const c = content[lang];
-
-const writeups = await getWriteups();
-const earned = certs.filter((cert) => cert.status === 'obtenida').map((cert) => cert.code);
-const machineWord = writeups.length === 1 ? t('unit.machine_one') : t('unit.machine_many');
-
-// Ficha del panel "terminal": todo sale de config/datos, nada inventado aquí.
-const profile = [
-  [t('hero.role_label'), c.profile.role],
-  [t('hero.education_label'), c.profile.education],
-  [t('hero.certs_label'), earned.length ? earned.join(', ') : '—'],
-  [t('hero.htb_label'), `${site.htb.rank} · ${site.htb.machines} ${t('unit.machine_many')}`],
-  [t('hero.writeups_label'), `${writeups.length} ${machineWord}`],
-];
 ---
 
 <section class="relative overflow-hidden border-b border-line">
@@ -80,25 +65,6 @@ const profile = [
       </div>
     </div>
 
-    <div class="min-w-0 overflow-hidden rounded-lg border border-line bg-surface" aria-label={t('hero.aria')}>
-      <div class="flex items-center justify-between border-b border-line bg-raised px-4 py-2 font-mono text-xs text-faint">
-        <span>{site.handle}@kali: ~</span>
-        <span>zsh</span>
-      </div>
-      <div class="space-y-1 p-5 font-mono text-[0.8125rem] leading-7">
-        <p><span class="text-accent">$</span> <span class="text-text">{t('hero.cmd')}</span></p>
-        <dl class="grid grid-cols-[6.5rem_1fr] gap-x-3 pb-1">
-          {
-            profile.map(([k, v]) => (
-              <>
-                <dt class="text-faint">{k}</dt>
-                <dd class="text-muted">{v}</dd>
-              </>
-            ))
-          }
-        </dl>
-        <p><span class="text-accent">$</span><span class="cursor" aria-hidden="true"></span></p>
-      </div>
-    </div>
+    <HeroTerminal />
   </div>
 </section>

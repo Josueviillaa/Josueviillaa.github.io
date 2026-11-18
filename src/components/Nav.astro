@@ -1,6 +1,7 @@
 ---
 import AccentSwitch from './AccentSwitch.astro';
 import LangSwitch from './LangSwitch.astro';
+import Icon from './Icon.astro';
 import { site } from '../config/site';
 import { withBase } from '../lib/url';
 import { getLang, homeHref, useT } from '../i18n';
@@ -75,6 +76,14 @@ const num = (i: number) => String(i + 1).padStart(2, '0');
       </ul>
 
       <div class="flex items-center gap-2 sm:gap-3">
+        <button
+          type="button"
+          data-cmdk-open
+          aria-label={`${t('cmdk.open')} (Ctrl+K)`}
+          class="inline-flex size-9 items-center justify-center rounded-md border border-line text-muted transition-colors hover:border-line-strong hover:text-text"
+        >
+          <Icon name="search" size={16} />
+        </button>
         <LangSwitch />
         <span class="hidden h-4 w-px bg-line sm:inline-block" aria-hidden="true"></span>
         <AccentSwitch />

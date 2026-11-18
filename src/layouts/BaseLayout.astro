@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import PrivacyNotice from '../components/PrivacyNotice.astro';
+import CommandPalette from '../components/CommandPalette.astro';
 import { site, content, githubUrl, linkedinUrl, htbUrl } from '../config/site';
 import { withBase } from '../lib/url';
 import { getLang, useT, localeTag, ogLocale } from '../i18n';
@@ -163,6 +164,7 @@ const personLd = {
     </footer>
 
     <PrivacyNotice />
+    <CommandPalette />
 
     <!-- Glosario: en táctil, tocar un término muestra/oculta su definición;
          Escape o un toque fuera lo cierran. En ratón/teclado basta hover/foco. -->
