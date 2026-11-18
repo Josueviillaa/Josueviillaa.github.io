@@ -119,7 +119,9 @@ const ui = {
     'tools.kicker': 'herramientas',
     'tools.title': 'Herramientas',
     'tools.intro':
-      'Utilidades y scripts que he escrito resolviendo máquinas. Son de código abierto y solo deben usarse en entornos autorizados.',
+      'Mini-herramientas que corren en tu navegador y algún script propio para descargar. Todo de código abierto y solo para entornos autorizados.',
+    'tools.interactive': 'En el navegador',
+    'tools.scripts': 'Scripts para descargar',
     'tools.empty': 'Aún no hay herramientas publicadas.',
     'tools.count_one': 'herramienta',
     'tools.count_many': 'herramientas',
@@ -246,7 +248,9 @@ const ui = {
     'tools.kicker': 'tools',
     'tools.title': 'Tools',
     'tools.intro':
-      'Utilities and scripts I wrote while solving machines. They are open source and should only be used in authorized environments.',
+      'Mini-tools that run in your browser plus the odd script of my own to download. All open source and for authorized environments only.',
+    'tools.interactive': 'In the browser',
+    'tools.scripts': 'Scripts to download',
     'tools.empty': 'No tools published yet.',
     'tools.count_one': 'tool',
     'tools.count_many': 'tools',

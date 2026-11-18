@@ -39,7 +39,6 @@ const cfg = {
     writeups: p('/writeups/'),
     notes: p('/notas/'),
     tools: p('/herramientas/'),
-    lab: p('/herramientas/lab/'),
     about: `${home}#sobre-mi`,
     skills: `${home}#skills`,
     certs: `${home}#certificaciones`,
@@ -217,10 +216,8 @@ const L =
           break;
         case 'tools':
         case 'herramientas':
-          out(`<p>→ ${link(cfg.nav.tools, 'herramientas', false)} · ${link(cfg.nav.lab, 'lab', false)}</p>`);
-          break;
         case 'lab':
-          window.location.href = cfg.nav.lab;
+          out(`<p>→ ${link(cfg.nav.tools, 'herramientas', false)}</p>`);
           break;
         case 'contact':
         case 'contacto':

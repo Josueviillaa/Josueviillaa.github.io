@@ -1,15 +1,18 @@
 ---
 import ToolCard from './ToolCard.astro';
+import TermWindow from './lab/TermWindow.astro';
+import Encoder from './lab/Encoder.astro';
+import JwtTool from './lab/JwtTool.astro';
+import EntropyMeter from './lab/EntropyMeter.astro';
+import HashTool from './lab/HashTool.astro';
 import Icon from './Icon.astro';
 import { getTools } from '../lib/tools';
-import { withBase } from '../lib/url';
 import { getLang, homeHref, useT } from '../i18n';
 
 const lang = getLang(Astro.url);
 const t = useT(lang);
 
 const tools = await getTools();
-const countWord = tools.length === 1 ? t('tools.count_one') : t('tools.count_many');
 ---
 
 <section class="wrap pt-10 pb-20 sm:pt-12 sm:pb-24">
@@ -25,37 +28,41 @@ const countWord = tools.length === 1 ? t('tools.count_one') : t('tools.count_man
       <span class="font-medium text-accent">$</span>
       <span class="h-px w-8 bg-line-strong" aria-hidden="true"></span>
       <span>{t('tools.kicker')}</span>
-      {tools.length > 0 && (
-        <>
-          <span class="text-line-strong">·</span>
-          <span>{tools.length} {countWord}</span>
-        </>
-      )}
     </p>
     <h1 class="text-4xl font-bold sm:text-5xl">{t('tools.title')}</h1>
     <p class="max-w-2xl text-muted">{t('tools.intro')}</p>
   </header>
 
-  <a
-    href={withBase(lang === 'en' ? '/en/herramientas/lab/' : '/herramientas/lab/')}
-    class="group mt-8 flex items-center gap-3 rounded-lg border border-accent/40 bg-accent-soft px-5 py-4 font-mono text-sm text-accent transition-colors hover:border-accent"
-  >
-    <span aria-hidden="true">$</span>
-    <span>{t('lab.link')}</span>
-    <Icon name="arrow-right" size={16} class="ml-auto transition-transform group-hover:translate-x-0.5" />
-  </a>
+  <!-- Interactivas (client-side) -->
+  <p class="mt-10 flex items-center gap-3 font-mono text-xs text-faint">
+    <span class="text-accent">//</span>
+    <span>{t('tools.interactive')}</span>
+    <span class="h-px flex-1 bg-line" aria-hidden="true"></span>
+  </p>
+  <div class="mt-5 grid items-start gap-5 lg:grid-cols-2">
+    <TermWindow title="base64.sh" meta="encode · decode"><Encoder /></TermWindow>
+    <TermWindow title="jwt.decode"><JwtTool /></TermWindow>
+    <TermWindow title="entropy.calc"><EntropyMeter /></TermWindow>
+    <TermWindow title="hashcat.run"><HashTool /></TermWindow>
+  </div>
 
+  <!-- Scripts descargables -->
   {
-    tools.length ? (
-      <ul class="mt-10 grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
-        {tools.map((entry) => (
-          <li>
-            <ToolCard entry={entry} />
-          </li>
-        ))}
-      </ul>
-    ) : (
-      <p class="mt-10 font-mono text-sm text-faint">{t('tools.empty')}</p>
+    tools.length > 0 && (
+      <>
+        <p class="mt-14 flex items-center gap-3 font-mono text-xs text-faint">
+          <span class="text-accent">//</span>
+          <span>{t('tools.scripts')}</span>
+          <span class="h-px flex-1 bg-line" aria-hidden="true" />
+        </p>
+        <ul class="mt-5 grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
+          {tools.map((entry) => (
+            <li>
+              <ToolCard entry={entry} />
+            </li>
+          ))}
+        </ul>
+      </>
     )
   }
 </section>
