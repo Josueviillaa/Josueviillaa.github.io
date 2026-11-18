@@ -239,6 +239,7 @@ const L =
         case 'recon':
         case 'fingerprint':
           out(recon());
+          window.__secret && window.__secret('recon');
           break;
         case 'about':
           out(`<p class="text-muted">${esc(cfg.about)}</p><p>→ ${link(cfg.nav.about, 'about', false)}</p>`);
@@ -304,12 +305,13 @@ const L =
         case 'scanlines': {
           const on = document.documentElement.hasAttribute('data-crt');
           if (on) { document.documentElement.removeAttribute('data-crt'); try { localStorage.removeItem('crt'); } catch {} }
-          else { document.documentElement.setAttribute('data-crt', ''); try { localStorage.setItem('crt', '1'); } catch {} }
+          else { document.documentElement.setAttribute('data-crt', ''); try { localStorage.setItem('crt', '1'); } catch {} window.__secret && window.__secret('crt'); }
           out(`<p class="text-faint">crt: ${on ? 'off' : 'on'}</p>`);
           break;
         }
         case 'flag':
           out('<p class="text-accent">flag{sh4rk_was_h3r3}</p><p class="text-faint">gg — prueba también el código konami</p>');
+          window.__secret && window.__secret('flag');
           break;
         default:
           out(`<p class="text-crit">${L.notFound}${esc(cmd)}</p>`);

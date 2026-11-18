@@ -52,7 +52,10 @@ const L =
 <script>
   const overlay = document.querySelector<HTMLElement>('[data-shortcuts]');
   if (overlay) {
-    const open = () => (overlay.hidden = false);
+    const open = () => {
+      overlay.hidden = false;
+      (window as unknown as { __secret?: (id: string) => void }).__secret?.('shortcuts');
+    };
     const close = () => (overlay.hidden = true);
     const typing = (el: EventTarget | null) =>
       el instanceof HTMLElement && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);

@@ -163,6 +163,7 @@ const personLd = {
           <a href={withBase('/rss.xml')} class="transition-colors hover:text-text">rss</a>
           <button type="button" data-matrix-toggle class="transition-colors hover:text-accent">matrix</button>
           <button type="button" data-crt-toggle class="transition-colors hover:text-accent">crt</button>
+          <span data-secrets hidden class="text-faint"></span>
         </div>
         <p>{t('footer.note')}</p>
       </div>
@@ -181,6 +182,13 @@ const personLd = {
       flag&#123;sh4rk_was_h3r3&#125; <span class="text-faint">// gg</span>
     </div>
 
+    <div
+      data-secret-toast
+      hidden
+      class="fixed bottom-4 left-1/2 z-[120] -translate-x-1/2 rounded-md border border-accent/50 bg-surface px-4 py-2 font-mono text-xs text-accent shadow-xl"
+    >
+    </div>
+
     <script is:inline>
       (function () {
         document.querySelectorAll('[data-matrix-toggle]').forEach((b) =>
@@ -191,7 +199,7 @@ const personLd = {
             const r = document.documentElement;
             const on = r.hasAttribute('data-crt');
             if (on) { r.removeAttribute('data-crt'); try { localStorage.removeItem('crt'); } catch {} }
-            else { r.setAttribute('data-crt', ''); try { localStorage.setItem('crt', '1'); } catch {} }
+            else { r.setAttribute('data-crt', ''); try { localStorage.setItem('crt', '1'); } catch {} window.__secret && window.__secret('crt'); }
           }),
         );
         try {
@@ -215,6 +223,7 @@ const personLd = {
             pos = 0;
             document.dispatchEvent(new Event('matrix:toggle'));
             showFlag();
+            window.__secret && window.__secret('flag');
           }
         });
       })();
@@ -245,6 +254,42 @@ const personLd = {
     </script>
 
     <script>
+      const SECRETS: Record<string, string> = { recon: 'recon', matrix: 'matrix rain', crt: 'crt', flag: 'flag', shortcuts: 'atajos' };
+      const SECRET_TOTAL = Object.keys(SECRETS).length;
+      const secretCounter = document.querySelector<HTMLElement>('[data-secrets]');
+      const secretToast = document.querySelector<HTMLElement>('[data-secret-toast]');
+      let secretToastTimer = 0;
+      const readSecrets = (): Set<string> => {
+        try {
+          return new Set(JSON.parse(localStorage.getItem('secrets') || '[]'));
+        } catch {
+          return new Set();
+        }
+      };
+      const renderSecrets = (n: number) => {
+        if (secretCounter) {
+          secretCounter.textContent = `secrets ${n}/${SECRET_TOTAL}`;
+          secretCounter.hidden = n === 0;
+        }
+      };
+      (window as unknown as { __secret?: (id: string) => void }).__secret = (id: string) => {
+        if (!(id in SECRETS)) return;
+        const set = readSecrets();
+        if (set.has(id)) return;
+        set.add(id);
+        try {
+          localStorage.setItem('secrets', JSON.stringify([...set]));
+        } catch {}
+        renderSecrets(set.size);
+        if (secretToast) {
+          secretToast.textContent = `🔓 ${SECRETS[id]} · ${set.size}/${SECRET_TOTAL}`;
+          secretToast.hidden = false;
+          window.clearTimeout(secretToastTimer);
+          secretToastTimer = window.setTimeout(() => (secretToast.hidden = true), 3500);
+        }
+      };
+      renderSecrets(readSecrets().size);
+
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       if (!reduce && 'IntersectionObserver' in window) {

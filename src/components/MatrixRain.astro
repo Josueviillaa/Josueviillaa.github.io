@@ -36,6 +36,7 @@
     function start() {
       if (running) return;
       running = true;
+      window.__secret && window.__secret('matrix');
       canvas.hidden = false;
       resize();
       window.addEventListener('resize', resize);
