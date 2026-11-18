@@ -1,13 +1,37 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { withBase } from '../lib/url';
+import { getLang } from '../i18n';
+
+const lang = getLang(Astro.url);
+const L =
+  lang === 'en'
+    ? { lead: 'target not found', body: 'The scan came back empty. There is nothing at this path.', home: 'return home' }
+    : { lead: 'objetivo no encontrado', body: 'El escaneo ha vuelto vacío. No hay nada en esta ruta.', home: 'volver al inicio' };
 ---
 
 <BaseLayout title="404">
-  <section class="wrap py-24 sm:py-32">
-    <p class="font-mono text-sm text-crit">404 · not found</p>
-    <h1 class="mt-4 text-4xl font-bold sm:text-5xl">Esta ruta no existe</h1>
-    <p class="mt-4 max-w-md text-muted">La enumeración no ha encontrado nada aquí. Vuelve al inicio.</p>
-    <a href={withBase('/')} class="link mt-8 inline-block font-mono text-sm">cd ~</a>
+  <section class="wrap flex min-h-[70vh] items-center py-20">
+    <div class="w-full max-w-xl overflow-hidden rounded-lg border border-line bg-surface">
+      <div class="flex items-center gap-2 border-b border-line bg-raised px-4 py-2 font-mono text-xs text-faint">
+        <span class="flex gap-1.5" aria-hidden="true">
+          <span class="size-2.5 rounded-full bg-crit/70"></span>
+          <span class="size-2.5 rounded-full bg-warn/70"></span>
+          <span class="size-2.5 rounded-full bg-accent/70"></span>
+        </span>
+        <span>sh4rk@kali: ~</span>
+      </div>
+      <div class="space-y-2 p-5 font-mono text-sm leading-7">
+        <p><span class="text-accent">$</span> <span class="text-text">cat $REQUEST_URI</span></p>
+        <p class="text-crit">[!] SEGMENTATION FAULT (core dumped)</p>
+        <p class="text-crit">404 · {L.lead}</p>
+        <p class="max-w-md text-muted">{L.body}</p>
+        <p class="pt-2">
+          <span class="text-accent">$</span>
+          <a href={withBase(lang === 'en' ? '/en/' : '/')} class="link">cd ~</a>
+          <span class="text-faint"># {L.home}</span>
+        </p>
+      </div>
+    </div>
   </section>
 </BaseLayout>

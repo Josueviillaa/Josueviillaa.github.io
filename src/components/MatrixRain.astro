@@ -1,0 +1,55 @@
+---
+/** Lluvia "matrix" en el color del acento. Oculta por defecto; se activa con
+ *  el comando `matrix` de la terminal o el código konami (evento matrix:toggle). */
+---
+<canvas data-matrix hidden aria-hidden="true" class="pointer-events-none fixed inset-0 z-[90] opacity-50"></canvas>
+
+<script is:inline>
+  (function () {
+    const canvas = document.querySelector('[data-matrix]');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const glyphs = 'アカサタナハマ0123456789ABCDEF<>/\\#$@%';
+    let raf = 0, cols = [], W = 0, H = 0, running = false;
+
+    function resize() {
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+      const n = Math.floor(W / 14);
+      cols = Array(n).fill(0).map(() => Math.random() * (H / 14));
+    }
+    function accent() {
+      return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#22c55e';
+    }
+    function draw() {
+      ctx.fillStyle = 'rgba(13,17,23,0.09)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = accent();
+      ctx.font = '14px monospace';
+      for (let i = 0; i < cols.length; i++) {
+        const ch = glyphs[(Math.random() * glyphs.length) | 0];
+        ctx.fillText(ch, i * 14, cols[i] * 14);
+        if (cols[i] * 14 > H && Math.random() > 0.975) cols[i] = 0;
+        else cols[i]++;
+      }
+      raf = requestAnimationFrame(draw);
+    }
+    function start() {
+      if (running) return;
+      running = true;
+      canvas.hidden = false;
+      resize();
+      window.addEventListener('resize', resize);
+      draw();
+    }
+    function stop() {
+      running = false;
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', resize);
+      ctx.clearRect(0, 0, W, H);
+      canvas.hidden = true;
+    }
+    document.addEventListener('matrix:toggle', () => (running ? stop() : start()));
+    document.addEventListener('matrix:on', start);
+  })();
+</script>

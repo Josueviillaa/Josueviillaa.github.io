@@ -255,6 +255,22 @@ const L =
         case 'sudo':
           out(`<p class="text-warn">${L.sudo}</p>`);
           break;
+        case 'matrix':
+        case 'rain':
+          document.dispatchEvent(new Event('matrix:toggle'));
+          out('<p class="text-faint">matrix: toggled</p>');
+          break;
+        case 'crt':
+        case 'scanlines': {
+          const on = document.documentElement.hasAttribute('data-crt');
+          if (on) { document.documentElement.removeAttribute('data-crt'); try { localStorage.removeItem('crt'); } catch {} }
+          else { document.documentElement.setAttribute('data-crt', ''); try { localStorage.setItem('crt', '1'); } catch {} }
+          out(`<p class="text-faint">crt: ${on ? 'off' : 'on'}</p>`);
+          break;
+        }
+        case 'flag':
+          out('<p class="text-accent">flag{sh4rk_was_h3r3}</p><p class="text-faint">gg — prueba también el código konami</p>');
+          break;
         default:
           out(`<p class="text-crit">${L.notFound}${esc(cmd)}</p>`);
       }

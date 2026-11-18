@@ -228,6 +228,20 @@
   transition: width 0.3s ease, background 0.3s ease;
 }
 
+/* ==========================================================================
+   Efecto CRT / scanlines (toggle con el comando `crt` de la terminal)
+   ========================================================================== */
+:root[data-crt] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 120% at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.28));
+}
+
 /* Dot "online" */
 .status-dot {
   position: relative;

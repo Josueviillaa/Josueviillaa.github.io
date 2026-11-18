@@ -1,0 +1,58 @@
+---
+/** Secuencia de arranque tipo boot-terminal. Se muestra una vez por sesión,
+ *  es saltable (tecla o clic) y se omite con prefers-reduced-motion. */
+import { getLang } from '../i18n';
+const lang = getLang(Astro.url);
+const skipMsg = lang === 'en' ? 'press any key to skip' : 'pulsa una tecla para saltar';
+const lines = [
+  '> booting sh4rk.sys ...',
+  '> loading kernel modules ....... [OK]',
+  '> mounting /writeups /notes /lab . [OK]',
+  '> init services: nmap burp bloodhound [OK]',
+  '> establishing uplink ........... [OK]',
+  '> SYSTEM READY.',
+];
+---
+
+<div data-boot hidden class="fixed inset-0 z-[200] flex items-center justify-center bg-bg">
+  <div class="w-full max-w-md px-6">
+    <pre data-boot-log class="font-mono text-sm leading-7 whitespace-pre-wrap text-accent"></pre>
+    <p class="mt-6 text-center font-mono text-xs text-faint">{skipMsg}</p>
+  </div>
+</div>
+
+<script is:inline define:vars={{ lines }}>
+  (function () {
+    const boot = document.querySelector('[data-boot]');
+    if (!boot) return;
+    const logEl = boot.querySelector('[data-boot-log]');
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let seen = false;
+    try { seen = sessionStorage.getItem('booted') === '1'; } catch {}
+    if (seen || reduce) return;
+    try { sessionStorage.setItem('booted', '1'); } catch {}
+
+    boot.hidden = false;
+    document.body.style.overflow = 'hidden';
+    let done = false;
+    function finish() {
+      if (done) return;
+      done = true;
+      boot.style.transition = 'opacity .4s ease';
+      boot.style.opacity = '0';
+      setTimeout(() => { boot.remove(); document.body.style.overflow = ''; }, 420);
+      window.removeEventListener('keydown', finish);
+      boot.removeEventListener('click', finish);
+    }
+    let i = 0;
+    function next() {
+      if (i >= lines.length) { setTimeout(finish, 480); return; }
+      logEl.textContent += (i ? '\n' : '') + lines[i];
+      i++;
+      setTimeout(next, 170 + Math.random() * 120);
+    }
+    next();
+    window.addEventListener('keydown', finish);
+    boot.addEventListener('click', finish);
+  })();
+</script>

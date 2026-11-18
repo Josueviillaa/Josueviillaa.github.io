@@ -1,0 +1,14 @@
+/* TEAM */
+  Pentester & dev: Josué (sh4rk)
+  Site: https://josueviillaa.github.io
+  GitHub: https://github.com/Josueviillaa
+  HackTheBox: https://app.hackthebox.com/users/2811454
+
+/* SITE */
+  Built with: Astro, TypeScript, Tailwind CSS
+  Hosted on: GitHub Pages
+  Theme: dark, accent-cyclable
+  Standards: HTML5, RFC 9116 (security.txt)
+
+/* NOTE */
+  No trackers. No cookies. Just writeups and tools.

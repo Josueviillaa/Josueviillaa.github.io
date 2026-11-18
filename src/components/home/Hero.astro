@@ -28,7 +28,7 @@ const c = content[lang];
         <span class="text-accent">{site.handle}</span> · {site.name}
       </p>
 
-      <h1 class="mt-3 font-display text-[2rem] font-bold leading-[1.08] tracking-tight text-text sm:text-5xl">
+      <h1 data-scramble class="mt-3 font-display text-[2rem] font-bold leading-[1.08] tracking-tight text-text sm:text-5xl">
         {c.headline}
       </h1>
 
@@ -68,3 +68,30 @@ const c = content[lang];
     <HeroTerminal />
   </div>
 </section>
+
+<script>
+  // El titular se "descifra" al cargar (scramble). El texto real está en el
+  // HTML (SEO/no-JS); esto solo lo anima. Se omite con prefers-reduced-motion.
+  const el = document.querySelector<HTMLElement>('[data-scramble]');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (el && !reduce) {
+    const final = el.textContent || '';
+    const glyphs = '!<>-_\\/[]{}=+*^?#01';
+    const settleAt = Array.from(final).map((_, i) => 8 + i * 1.25);
+    let frame = 0;
+    function tick() {
+      let outText = '';
+      let settled = 0;
+      for (let i = 0; i < final.length; i++) {
+        if (final[i] === ' ') { outText += ' '; settled++; continue; }
+        if (frame >= settleAt[i]) { outText += final[i]; settled++; }
+        else outText += glyphs[(Math.random() * glyphs.length) | 0];
+      }
+      el!.textContent = outText;
+      frame++;
+      if (settled < final.length) requestAnimationFrame(tick);
+      else el!.textContent = final;
+    }
+    tick();
+  }
+</script>
