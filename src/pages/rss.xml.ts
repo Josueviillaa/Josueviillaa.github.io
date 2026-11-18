@@ -26,7 +26,7 @@ export async function GET(context: APIContext) {
   ].sort((a, b) => b.pubDate.getTime() - a.pubDate.getTime());
 
   return rss({
-    title: `${site.name} — writeups y notas`,
+    title: `${site.name} · writeups y notas`,
     description: 'Writeups de máquinas de HackTheBox y notas de seguridad ofensiva de Josu.',
     site: context.site ?? 'https://josueviillaa.github.io',
     items,

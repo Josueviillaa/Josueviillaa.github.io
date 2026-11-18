@@ -1,16 +1,25 @@
 ---
 import Icon from './Icon.astro';
+import { getLang, useT } from '../i18n';
+
+const t = useT(getLang(Astro.url));
+const toLight = t('theme.toLight');
+const toDark = t('theme.toDark');
 ---
 
 <!--
   El icono visible es el del tema AL QUE cambias (sol en oscuro, luna en claro).
   Lo decide CSS con los tokens --show-if-dark / --show-if-light, así que es
   correcto desde el primer pintado, sin esperar a JavaScript.
+  Las etiquetas (to-light / to-dark) vienen traducidas desde i18n.
 -->
 <button
   type="button"
   data-theme-toggle
-  aria-label="Cambiar tema"
+  data-label-light={toLight}
+  data-label-dark={toDark}
+  aria-label={toLight}
+  title={toLight}
   class="inline-flex size-9 items-center justify-center rounded-md border border-line text-muted transition-colors hover:border-line-strong hover:text-text"
 >
   <Icon name="sun" class="if-dark" />
@@ -26,8 +35,10 @@ import Icon from './Icon.astro';
   const buttons = document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]');
 
   function syncLabels() {
-    const label = current() === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro';
     buttons.forEach((btn) => {
+      // En oscuro el botón lleva al claro, y al revés. Textos traducidos en data-*.
+      const label = current() === 'dark' ? btn.dataset.labelLight : btn.dataset.labelDark;
+      if (!label) return;
       btn.setAttribute('aria-label', label);
       btn.title = label;
     });

@@ -62,6 +62,8 @@ const ui = {
     'nav.close': 'cerrar',
     'nav.aria': 'Principal',
     'lang.aria': 'Idioma',
+    'theme.toLight': 'Cambiar a tema claro',
+    'theme.toDark': 'Cambiar a tema oscuro',
 
     'a11y.skip': 'Saltar al contenido',
     'footer.note': 'Construido con Astro · contenido educativo sobre entornos autorizados',
@@ -87,7 +89,7 @@ const ui = {
 
     'skills.kicker': 'skills',
     'skills.title': 'Skills y stack',
-    'skills.intro': 'Las áreas, técnicas y herramientas con las que trabajo a diario en laboratorios y máquinas.',
+    'skills.intro': 'Las áreas y técnicas que más he practicado resolviendo máquinas, con las herramientas que uso en cada una.',
 
     'certs.kicker': 'certs',
     'certs.title': 'Certificaciones',
@@ -108,7 +110,7 @@ const ui = {
     'notes.kicker': 'notas',
     'notes.title': 'Notas y técnicas',
     'notes.intro':
-      'Apuntes sobre vectores y técnicas de seguridad ofensiva, explicados de forma genérica — el concepto, no una máquina concreta.',
+      'Apuntes sobre vectores y técnicas de seguridad ofensiva, explicados de forma genérica: el concepto, no una máquina concreta.',
     'notes.empty': 'Aún no hay notas publicadas.',
     'notes.sections': 'secciones',
     'notes.footer':
@@ -119,7 +121,7 @@ const ui = {
     'tools.kicker': 'herramientas',
     'tools.title': 'Herramientas',
     'tools.intro':
-      'Utilidades y scripts que he escrito resolviendo máquinas y laboratorios. Código abierto, documentado y pensado para usarse solo en entornos autorizados.',
+      'Utilidades y scripts que he escrito resolviendo máquinas. Son de código abierto y solo deben usarse en entornos autorizados.',
     'tools.empty': 'Aún no hay herramientas publicadas.',
     'tools.count_one': 'herramienta',
     'tools.count_many': 'herramientas',
@@ -131,7 +133,7 @@ const ui = {
     'contact.kicker': 'contacto',
     'contact.title': 'Hablemos',
     'contact.body':
-      'Si buscas un perfil ofensivo junior —metódico, autodidacta y con hambre de crecer— para un puesto, unas prácticas o un proyecto, hablemos. Respondo por email o LinkedIn.',
+      'Si buscas un perfil ofensivo junior para un puesto, unas prácticas o un proyecto, escríbeme. Respondo por email o LinkedIn.',
     'contact.cta': 'Escríbeme',
 
     'card.read': 'leer writeup',
@@ -168,6 +170,8 @@ const ui = {
     'nav.close': 'close',
     'nav.aria': 'Main',
     'lang.aria': 'Language',
+    'theme.toLight': 'Switch to light theme',
+    'theme.toDark': 'Switch to dark theme',
 
     'a11y.skip': 'Skip to content',
     'footer.note': 'Built with Astro · educational content on authorized environments',
@@ -193,7 +197,7 @@ const ui = {
 
     'skills.kicker': 'skills',
     'skills.title': 'Skills & stack',
-    'skills.intro': 'The areas, techniques and tools I work with day to day across labs and machines.',
+    'skills.intro': 'The areas and techniques I have practised most while solving machines, with the tools I use for each.',
 
     'certs.kicker': 'certs',
     'certs.title': 'Certifications',
@@ -214,7 +218,7 @@ const ui = {
     'notes.kicker': 'notes',
     'notes.title': 'Notes & techniques',
     'notes.intro':
-      'Notes on offensive-security vectors and techniques, explained generically — the concept, not a specific machine.',
+      'Notes on offensive-security vectors and techniques, explained generically: the concept, not a specific machine.',
     'notes.empty': 'No notes published yet.',
     'notes.sections': 'sections',
     'notes.footer':
@@ -225,7 +229,7 @@ const ui = {
     'tools.kicker': 'tools',
     'tools.title': 'Tools',
     'tools.intro':
-      'Utilities and scripts I wrote while solving machines and labs. Open source, documented and meant to be used only in authorized environments.',
+      'Utilities and scripts I wrote while solving machines. They are open source and should only be used in authorized environments.',
     'tools.empty': 'No tools published yet.',
     'tools.count_one': 'tool',
     'tools.count_many': 'tools',
@@ -237,7 +241,7 @@ const ui = {
     'contact.kicker': 'contact',
     'contact.title': "Let's talk",
     'contact.body':
-      "If you're looking for a junior offensive-security profile —methodical, self-taught and hungry to grow— for a role, an internship or a project, let's talk. I reply by email or LinkedIn.",
+      "If you're looking for a junior offensive-security profile for a role, an internship or a project, get in touch. I reply by email or LinkedIn.",
     'contact.cta': 'Get in touch',
 
     'card.read': 'read writeup',
