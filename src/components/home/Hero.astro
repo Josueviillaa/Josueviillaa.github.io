@@ -39,9 +39,11 @@ const profile = [
         <span>{c.status}</span>
       </p>
 
-      <p class="mt-7 font-mono text-sm tracking-[0.25em] text-faint uppercase">{site.name}</p>
+      <p class="mt-7 font-mono text-sm tracking-[0.25em] text-faint uppercase">
+        <span class="text-accent">{site.handle}</span> · {site.name}
+      </p>
 
-      <h1 class="mt-3 font-display text-4xl font-bold leading-[1.08] tracking-tight text-text sm:text-5xl">
+      <h1 class="mt-3 font-display text-[2rem] font-bold leading-[1.08] tracking-tight text-text sm:text-5xl">
         {c.headline}
       </h1>
 
@@ -80,7 +82,7 @@ const profile = [
 
     <div class="min-w-0 overflow-hidden rounded-lg border border-line bg-surface" aria-label={t('hero.aria')}>
       <div class="flex items-center justify-between border-b border-line bg-raised px-4 py-2 font-mono text-xs text-faint">
-        <span>josue@kali: ~</span>
+        <span>{site.handle}@kali: ~</span>
         <span>zsh</span>
       </div>
       <div class="space-y-1 p-5 font-mono text-[0.8125rem] leading-7">

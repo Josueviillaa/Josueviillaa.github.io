@@ -12,6 +12,9 @@ import type { Lang } from '../i18n';
 
 export const site = {
   name: 'Josué',
+  /** Alias/handle de la marca (hacker). Se muestra en nav, hero y terminal;
+   *  el nombre real (name) sigue en títulos, OG y datos estructurados. */
+  handle: 'sh4rk',
   email: 'josueeloo@icloud.com',
   links: {
     github: 'Josueviillaa',

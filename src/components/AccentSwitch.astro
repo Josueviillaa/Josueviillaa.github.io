@@ -1,0 +1,82 @@
+---
+/**
+ * Rotador de color de acento. La web es solo oscura; esto cambia el COLOR
+ * de acento de toda la interfaz (y el tinte del fondo) de forma seamless.
+ * Un clic cicla al siguiente color; la elección se guarda en localStorage
+ * y se aplica antes del primer pintado (script inline en BaseLayout).
+ */
+import { getLang } from '../i18n';
+
+const lang = getLang(Astro.url);
+
+// Orden del ciclo. 'teal' es el acento por defecto (sin override en CSS).
+const accents = [
+  { key: 'teal', es: 'teal', en: 'teal' },
+  { key: 'green', es: 'verde', en: 'green' },
+  { key: 'cyan', es: 'cian', en: 'cyan' },
+  { key: 'amber', es: 'ámbar', en: 'amber' },
+  { key: 'magenta', es: 'magenta', en: 'magenta' },
+  { key: 'red', es: 'rojo', en: 'red' },
+  { key: 'purple', es: 'púrpura', en: 'purple' },
+];
+const keys = accents.map((a) => a.key);
+const names = accents.map((a) => a[lang]);
+const ariaPrefix = lang === 'en' ? 'Accent color' : 'Color de acento';
+const firstName = names[0];
+---
+
+<button
+  type="button"
+  data-accent-switch
+  data-keys={JSON.stringify(keys)}
+  data-names={JSON.stringify(names)}
+  data-aria-prefix={ariaPrefix}
+  aria-label={`${ariaPrefix}: ${firstName}`}
+  title={`${ariaPrefix}: ${firstName}`}
+  class="inline-flex h-9 items-center gap-2 rounded-md border border-line px-2.5 font-mono text-xs text-muted transition-colors hover:border-line-strong hover:text-text"
+>
+  <span class="size-2.5 rounded-full bg-accent" aria-hidden="true"></span>
+  <span data-accent-name class="hidden sm:inline" aria-hidden="true">{firstName}</span>
+</button>
+
+<script>
+  const root = document.documentElement;
+  const btns = [...document.querySelectorAll<HTMLButtonElement>('[data-accent-switch]')];
+
+  if (btns.length) {
+    const keys: string[] = JSON.parse(btns[0].dataset.keys || '[]');
+    const names: string[] = JSON.parse(btns[0].dataset.names || '[]');
+    const prefix = btns[0].dataset.ariaPrefix || 'Accent';
+
+    const currentIndex = () => {
+      const c = root.dataset.accent;
+      const i = c ? keys.indexOf(c) : -1;
+      return i >= 0 ? i : 0;
+    };
+
+    function paint(i: number) {
+      btns.forEach((b) => {
+        const el = b.querySelector<HTMLElement>('[data-accent-name]');
+        if (el) el.textContent = names[i];
+        const label = `${prefix}: ${names[i]}`;
+        b.setAttribute('aria-label', label);
+        b.title = label;
+      });
+    }
+
+    paint(currentIndex());
+
+    btns.forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const next = (currentIndex() + 1) % keys.length;
+        root.dataset.accent = keys[next];
+        try {
+          localStorage.setItem('accent', keys[next]);
+        } catch {
+          /* almacenamiento bloqueado: dura hasta recargar */
+        }
+        paint(next);
+      }),
+    );
+  }
+</script>

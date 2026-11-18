@@ -2,17 +2,25 @@
 
 /* ==========================================================================
    TOKENS DE COLOR — única fuente de verdad.
-   Tres estados de tema:
-     1. :root sin atributo         → oscuro (por defecto)
-     2. prefers-color-scheme: light → claro, salvo que el usuario haya
-                                      forzado [data-theme="dark"]
-     3. [data-theme="light|dark"]   → elección explícita del toggle; gana
-                                      siempre a la preferencia del SO
-   Si cambias un color claro, cámbialo en los DOS bloques claros.
+   La web es SOLO modo oscuro (decisión de diseño). Lo que el usuario cambia
+   es el COLOR DE ACENTO, mediante el atributo [data-accent] en <html>
+   (ver AccentSwitch). El acento está registrado con @property para poder
+   transicionarlo de forma seamless; el fondo lleva un tinte del acento, así
+   que al cambiar de color toda la web se tiñe suavemente.
    ========================================================================== */
 
-:root,
-:root[data-theme="dark"] {
+@property --accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2ee6c3;
+}
+@property --accent-ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #04211b;
+}
+
+:root {
   color-scheme: dark;
 
   --bg: #0d1117;
@@ -25,63 +33,26 @@
   --text-muted: #a3aeb9;
   --text-faint: #7d8590;
 
+  /* Acento por defecto (teal); lo sobrescribe [data-accent]. */
   --accent: #2ee6c3;
   --accent-ink: #04211b; /* texto sobre fondo de acento */
   --warn: #ffb454;
   --crit: #ff6b6b;
 
-  /* Icono del toggle: muestra el tema al que vas a cambiar */
-  --show-if-dark: inline-block;
-  --show-if-light: none;
+  /* Transición seamless del acento al cambiar de tema de color */
+  transition: --accent 0.55s ease, --accent-ink 0.55s ease;
 }
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    color-scheme: light;
+/* Paletas de acento: fondo oscuro fijo, solo cambia el color.
+   Cada ink es un tono muy oscuro del color para texto sobre el acento. */
+:root[data-accent="green"]   { --accent: #3ee66b; --accent-ink: #052310; }
+:root[data-accent="cyan"]    { --accent: #49b4ff; --accent-ink: #04172b; }
+:root[data-accent="amber"]   { --accent: #f5b53d; --accent-ink: #241700; }
+:root[data-accent="magenta"] { --accent: #ff5cc0; --accent-ink: #2a0420; }
+:root[data-accent="red"]     { --accent: #ff6670; --accent-ink: #2a0608; }
+:root[data-accent="purple"]  { --accent: #b48cff; --accent-ink: #150a2e; }
 
-    --bg: #f6f7f5;
-    --surface: #ffffff;
-    --surface-raised: #eef0ec;
-    --line: #e1e4df;
-    --line-strong: #c9cdc6;
-
-    --text: #11161c;
-    --text-muted: #46505b;
-    --text-faint: #66707a;
-
-    --accent: #087a66; /* cian oscurecido: contraste AA sobre claro */
-    --accent-ink: #ffffff;
-    --warn: #9a5800;
-    --crit: #c02626;
-
-    --show-if-dark: none;
-    --show-if-light: inline-block;
-  }
-}
-
-:root[data-theme="light"] {
-  color-scheme: light;
-
-  --bg: #f6f7f5;
-  --surface: #ffffff;
-  --surface-raised: #eef0ec;
-  --line: #e1e4df;
-  --line-strong: #c9cdc6;
-
-  --text: #11161c;
-  --text-muted: #46505b;
-  --text-faint: #66707a;
-
-  --accent: #087a66;
-  --accent-ink: #ffffff;
-  --warn: #9a5800;
-  --crit: #c02626;
-
-  --show-if-dark: none;
-  --show-if-light: inline-block;
-}
-
-/* Derivados: se recalculan solos en cada tema */
+/* Derivados: se recalculan solos con el acento activo */
 :root {
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --warn-soft: color-mix(in srgb, var(--warn) 12%, transparent);
@@ -142,7 +113,12 @@
 
   body {
     min-height: 100dvh;
-    background: var(--bg);
+    /* Fondo oscuro con un tinte sutil del acento: no es negro plano y se
+       mueve junto al tema de color de forma seamless. */
+    background:
+      radial-gradient(130% 85% at 50% -15%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 55%),
+      var(--bg);
+    background-attachment: fixed;
     color: var(--text);
     font-family: var(--font-sans);
     font-size: 1rem;
@@ -229,9 +205,6 @@
 }
 @keyframes blink { 50% { opacity: 0; } }
 
-/* Iconos del toggle de tema */
-.if-dark { display: var(--show-if-dark); }
-.if-light { display: var(--show-if-light); }
 
 /* ==========================================================================
    Bloques de código (Shiki con temas duales, sin color por defecto)

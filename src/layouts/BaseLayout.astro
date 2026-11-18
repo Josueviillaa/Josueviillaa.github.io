@@ -85,9 +85,8 @@ const personLd = {
     <link rel="apple-touch-icon" href={withBase('/apple-touch-icon.png')} />
     <link rel="manifest" href={withBase('/site.webmanifest')} />
     <link rel="alternate" type="application/rss+xml" title={`${site.name} · writeups y notas`} href={withBase('/rss.xml')} />
-    <meta name="color-scheme" content="dark light" />
-    <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#f6f7f5" media="(prefers-color-scheme: light)" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d1117" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content={pageTitle} />
@@ -106,11 +105,11 @@ const personLd = {
 
     {isHome && <script type="application/ld+json" set:html={JSON.stringify(personLd)} />}
 
-    <!-- Aplica el tema guardado ANTES de pintar, para evitar parpadeo -->
+    <!-- Aplica el color de acento guardado ANTES de pintar, para evitar saltos -->
     <script is:inline>
       try {
-        const tm = localStorage.getItem('theme');
-        if (tm === 'light' || tm === 'dark') document.documentElement.dataset.theme = tm;
+        const ac = localStorage.getItem('accent');
+        if (ac) document.documentElement.dataset.accent = ac;
       } catch {}
     </script>
 

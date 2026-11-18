@@ -62,15 +62,13 @@ const ui = {
     'nav.close': 'cerrar',
     'nav.aria': 'Principal',
     'lang.aria': 'Idioma',
-    'theme.toLight': 'Cambiar a tema claro',
-    'theme.toDark': 'Cambiar a tema oscuro',
 
     'a11y.skip': 'Saltar al contenido',
     'footer.note': 'Construido con Astro · contenido educativo sobre entornos autorizados',
     'privacy.nav': 'privacidad',
     'privacy.title': 'Privacidad',
     'legal.nav': 'aviso legal',
-    'notice.text': 'Esta web solo guarda tus preferencias (tema e idioma) en tu navegador. Sin cookies de seguimiento.',
+    'notice.text': 'Esta web solo guarda tus preferencias (color de acento e idioma) en tu navegador. Sin cookies de seguimiento.',
     'notice.ok': 'Entendido',
     'notice.more': 'Más info',
 
@@ -170,15 +168,13 @@ const ui = {
     'nav.close': 'close',
     'nav.aria': 'Main',
     'lang.aria': 'Language',
-    'theme.toLight': 'Switch to light theme',
-    'theme.toDark': 'Switch to dark theme',
 
     'a11y.skip': 'Skip to content',
     'footer.note': 'Built with Astro · educational content on authorized environments',
     'privacy.nav': 'privacy',
     'privacy.title': 'Privacy',
     'legal.nav': 'legal',
-    'notice.text': 'This site only stores your preferences (theme and language) in your browser. No tracking cookies.',
+    'notice.text': 'This site only stores your preferences (accent colour and language) in your browser. No tracking cookies.',
     'notice.ok': 'Got it',
     'notice.more': 'Learn more',
 
