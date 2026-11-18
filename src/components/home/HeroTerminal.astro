@@ -57,9 +57,12 @@ const L =
         themeOk: 'accent changed to ',
         sudo: "nice try \u{1F60F} — no root for you here",
         aria: 'Interactive terminal',
+        reconHead: '// what your browser reveals without being asked:',
+        reconNote: 'none of this is sent or stored — it is just your browser.',
         cmds: [
           ['help', 'this list'],
           ['whoami', 'who I am'],
+          ['recon', 'your browser fingerprint'],
           ['about', 'about me'],
           ['skills', 'skills & stack'],
           ['certs', 'certifications'],
@@ -83,9 +86,12 @@ const L =
         themeOk: 'acento cambiado a ',
         sudo: "buen intento \u{1F60F} — aquí no hay root que valga",
         aria: 'Terminal interactiva',
+        reconHead: '// lo que tu navegador revela sin que se lo pidan:',
+        reconNote: 'nada de esto se envía ni se guarda — es solo tu navegador.',
         cmds: [
           ['help', 'esta lista'],
           ['whoami', 'quién soy'],
+          ['recon', 'fingerprint de tu navegador'],
           ['about', 'sobre mí'],
           ['skills', 'skills y stack'],
           ['certs', 'certificaciones'],
@@ -177,6 +183,38 @@ const L =
     const link = (href, label, ext) =>
       `<a href="${href}" class="link"${ext ? ' target="_blank" rel="noopener noreferrer"' : ''}>${esc(label)}</a>`;
 
+    function recon() {
+      const n = navigator;
+      const s = screen;
+      let gpu = '—';
+      try {
+        const gl = document.createElement('canvas').getContext('webgl');
+        const dbg = gl && gl.getExtension('WEBGL_debug_renderer_info');
+        if (gl && dbg) gpu = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+      } catch {}
+      const conn = n.connection && n.connection.effectiveType;
+      const rows = [
+        ['user-agent', n.userAgent],
+        ['plataforma', n.platform || '—'],
+        ['idiomas', (n.languages || [n.language]).join(', ')],
+        ['zona horaria', Intl.DateTimeFormat().resolvedOptions().timeZone],
+        ['pantalla', `${s.width}×${s.height} @${window.devicePixelRatio}x · ${s.colorDepth}-bit`],
+        ['viewport', `${window.innerWidth}×${window.innerHeight}`],
+        ['cpu / mem', `${n.hardwareConcurrency || '?'} hilos · ${n.deviceMemory ? n.deviceMemory + ' GB' : '? GB'}`],
+        ['gpu', gpu],
+        ['táctil', n.maxTouchPoints > 0 ? `sí (${n.maxTouchPoints})` : 'no'],
+        ['conexión', conn || '—'],
+        ['cookies / dnt', `${n.cookieEnabled ? 'on' : 'off'} / ${n.doNotTrack || 'unset'}`],
+      ];
+      return (
+        `<p class="text-faint">${L.reconHead}</p>` +
+        `<dl class="grid grid-cols-[7rem_1fr] gap-x-3">` +
+        rows.map(([k, v]) => `<dt class="text-faint">${k}</dt><dd class="break-all text-muted">${esc(String(v))}</dd>`).join('') +
+        `</dl>` +
+        `<p class="text-faint">${L.reconNote}</p>`
+      );
+    }
+
     out(`<p class="text-faint">${L.hint}</p>`);
 
     const history = [];
@@ -197,6 +235,10 @@ const L =
           break;
         case 'whoami':
           out(`<p>${esc(cfg.handle)} · <span class="text-muted">${esc(cfg.name)} — ${esc(cfg.role)}</span></p>`);
+          break;
+        case 'recon':
+        case 'fingerprint':
+          out(recon());
           break;
         case 'about':
           out(`<p class="text-muted">${esc(cfg.about)}</p><p>→ ${link(cfg.nav.about, 'about', false)}</p>`);
