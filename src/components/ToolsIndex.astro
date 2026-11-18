@@ -33,7 +33,6 @@ const tools = await getTools();
     <p class="max-w-2xl text-muted">{t('tools.intro')}</p>
   </header>
 
-  <!-- Interactivas (client-side) -->
   <p class="mt-10 flex items-center gap-3 font-mono text-xs text-faint">
     <span class="text-accent">//</span>
     <span>{t('tools.interactive')}</span>
@@ -46,7 +45,6 @@ const tools = await getTools();
     <TermWindow title="hashcat.run"><HashTool /></TermWindow>
   </div>
 
-  <!-- Scripts descargables -->
   {
     tools.length > 0 && (
       <>

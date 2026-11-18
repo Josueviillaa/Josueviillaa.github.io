@@ -1,6 +1,5 @@
 ---
-/** Secuencia de arranque tipo boot-terminal. Se muestra una vez por sesión,
- *  es saltable (tecla o clic) y se omite con prefers-reduced-motion. */
+/** Boot-terminal: una vez por sesión, saltable, se omite con reduce-motion. */
 import { getLang } from '../i18n';
 const lang = getLang(Astro.url);
 const skipMsg = lang === 'en' ? 'press any key to skip' : 'pulsa una tecla para saltar';

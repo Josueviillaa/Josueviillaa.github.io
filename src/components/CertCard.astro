@@ -29,13 +29,8 @@ const gid = `m-${cert.code}`;
         </linearGradient>
       </defs>
 
-      <!-- Superficie metálica lisa (un solo degradado, sin facetas) -->
       <polygon points="100,0 200,55 200,165 100,220 0,165 0,55" fill={`url(#${gid})`}></polygon>
-
-      <!-- Brillo superior muy sutil (gloss) -->
       <polygon points="100,0 200,55 100,112 0,55" fill="#ffffff" opacity="0.045"></polygon>
-
-      <!-- Aro fino exterior (plata neutra) + hairline interior -->
       <polygon class="rim" points="100,0 200,55 200,165 100,220 0,165 0,55" fill="none" stroke-width="1.2"></polygon>
       <polygon
         points="100,7 192,57 192,163 100,213 8,163 8,57"
@@ -44,7 +39,6 @@ const gid = `m-${cert.code}`;
         stroke-width="0.5"
         opacity="0.06"></polygon>
 
-      <!-- Código grabado (sombra + luz) -->
       <text
         x="100"
         y={codeY}
@@ -62,7 +56,6 @@ const gid = `m-${cert.code}`;
         >{cert.code}</text>
     </svg>
 
-    <!-- Reflejo blando que glisa con el ratón, muy discreto -->
     <span class="cert-shine"></span>
   </div>
 

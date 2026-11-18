@@ -69,6 +69,8 @@ const L =
           ['contact', 'email & socials'],
           ['theme &lt;color&gt;', 'change accent colour'],
           ['cv', 'download CV'],
+          ['matrix', 'matrix rain'],
+          ['crt', 'CRT / scanlines'],
           ['clear', 'clear the screen'],
         ],
       }
@@ -93,6 +95,8 @@ const L =
           ['contact', 'email y redes'],
           ['theme &lt;color&gt;', 'cambiar color de acento'],
           ['cv', 'descargar CV'],
+          ['matrix', 'lluvia matrix'],
+          ['crt', 'filtro CRT / scanlines'],
           ['clear', 'limpiar la pantalla'],
         ],
       };
@@ -130,7 +134,6 @@ const L =
       </dl>
     </div>
 
-    <!-- Línea de entrada (interactiva, la activa el script) -->
     <form data-term-form class="mt-1 flex items-center gap-2" hidden>
       <label class="text-accent" for="term-input" aria-hidden="true">$</label>
       <input
@@ -144,7 +147,6 @@ const L =
         aria-label={L.aria}
       />
     </form>
-    <!-- Prompt estático de fallback (sin JS) -->
     <p data-term-static><span class="text-accent">$</span><span class="cursor" aria-hidden="true"></span></p>
   </div>
 </div>
@@ -159,7 +161,6 @@ const L =
     const staticPrompt = root.querySelector('[data-term-static]');
     if (!log || !form || !input) return;
 
-    // Activa la terminal: oculta el prompt estático, muestra el input.
     staticPrompt?.remove();
     form.hidden = false;
 
@@ -282,7 +283,6 @@ const L =
       if (e.key === 'ArrowUp') { e.preventDefault(); if (hi > 0) { hi--; input.value = history[hi] || ''; } }
       else if (e.key === 'ArrowDown') { e.preventDefault(); if (hi < history.length) { hi++; input.value = history[hi] || ''; } }
     });
-    // Enfocar al hacer clic en el cuerpo de la terminal (no en un enlace).
     root.addEventListener('click', (e) => {
       if (e.target instanceof Element && !e.target.closest('a')) input.focus();
     });

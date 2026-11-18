@@ -62,7 +62,6 @@ const personLd = {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Seguridad: limita de dónde se puede cargar contenido (CSP) y qué referrer se envía. -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'self'; upgrade-insecure-requests"
@@ -108,7 +107,6 @@ const personLd = {
 
     {isHome && <script type="application/ld+json" set:html={JSON.stringify(personLd)} />}
 
-    <!-- Aplica el color de acento guardado ANTES de pintar, para evitar saltos -->
     <script is:inline>
       try {
         const ac = localStorage.getItem('accent');
@@ -118,8 +116,7 @@ const personLd = {
     </script>
 
     {
-      /* Primera visita a la home en español: si el navegador no está en español,
-         redirige a /en/. La elección del switch se guarda y manda sobre esto. */
+      /* Primera visita a la home: redirige a /en/ si el navegador no está en español. */
       isHome && lang === 'es' && (
         <script
           is:inline
@@ -162,6 +159,8 @@ const personLd = {
             {t('privacy.nav')}
           </a>
           <a href={withBase('/rss.xml')} class="transition-colors hover:text-text">rss</a>
+          <button type="button" data-matrix-toggle class="transition-colors hover:text-accent">matrix</button>
+          <button type="button" data-crt-toggle class="transition-colors hover:text-accent">crt</button>
         </div>
         <p>{t('footer.note')}</p>
       </div>
@@ -171,7 +170,6 @@ const personLd = {
     <CommandPalette />
     <MatrixRain />
 
-    <!-- Toast oculto para la flag CTF (konami) -->
     <div
       data-flag-toast
       hidden
@@ -180,12 +178,22 @@ const personLd = {
       flag&#123;sh4rk_was_h3r3&#125; <span class="text-faint">// gg</span>
     </div>
 
-    <!-- Easter eggs: banner en consola + código konami (matrix + flag) -->
     <script is:inline>
       (function () {
+        document.querySelectorAll('[data-matrix-toggle]').forEach((b) =>
+          b.addEventListener('click', () => document.dispatchEvent(new Event('matrix:toggle'))),
+        );
+        document.querySelectorAll('[data-crt-toggle]').forEach((b) =>
+          b.addEventListener('click', () => {
+            const r = document.documentElement;
+            const on = r.hasAttribute('data-crt');
+            if (on) { r.removeAttribute('data-crt'); try { localStorage.removeItem('crt'); } catch {} }
+            else { r.setAttribute('data-crt', ''); try { localStorage.setItem('crt', '1'); } catch {} }
+          }),
+        );
         try {
           console.log('%c~/sh4rk', 'color:#22c55e;font:700 20px monospace');
-          console.log('%c¿Curioso/a? El código konami hace algo. // Curious? The konami code does something.', 'color:#7d8590;font:12px monospace');
+          console.log('%cteclea el konami o pulsa matrix en el pie. // konami code, or hit matrix in the footer.', 'color:#7d8590;font:12px monospace');
         } catch {}
         const seq = [38, 38, 40, 40, 37, 39, 37, 39, 66, 65];
         let pos = 0;
@@ -209,8 +217,6 @@ const personLd = {
       })();
     </script>
 
-    <!-- Glosario: en táctil, tocar un término muestra/oculta su definición;
-         Escape o un toque fuera lo cierran. En ratón/teclado basta hover/foco. -->
     <script is:inline>
       (function () {
         function closeAll(except) {

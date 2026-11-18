@@ -32,6 +32,5 @@ const { Content, headings } = await render(entry);
 ---
 
 <WriteupLayout entry={entry} headings={headings} prev={prev} next={next}>
-  <!-- Componentes disponibles en cualquier .mdx sin importarlos -->
   <Content components={{ Terminal, Lesson, Callout, AttackChain }} />
 </WriteupLayout>
