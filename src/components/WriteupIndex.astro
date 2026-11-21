@@ -8,7 +8,7 @@ import { getLang, homeHref, useT } from '../i18n';
 const lang = getLang(Astro.url);
 const t = useT(lang);
 
-const writeups = await getWriteups();
+const writeups = await getWriteups(lang);
 const countWord = writeups.length === 1 ? t('writeups.count_one') : t('writeups.count_many');
 
 // Normaliza el SO a su familia (Windows / Linux) para filtrar.

@@ -1,6 +1,7 @@
 ---
 import Icon from '../Icon.astro';
 import { withBase } from '../../lib/url';
+import { writeupSlug } from '../../lib/writeups';
 import { getLang, useT } from '../../i18n';
 
 interface Neighbour {
@@ -17,7 +18,8 @@ const { prev, next } = Astro.props;
 const lang = getLang(Astro.url);
 const t = useT(lang);
 
-const href = (id: string) => withBase(`/writeups/${id}/`);
+const prefix = lang === 'en' ? '/en/writeups/' : '/writeups/';
+const href = (id: string) => withBase(`${prefix}${writeupSlug(id)}/`);
 ---
 
 {

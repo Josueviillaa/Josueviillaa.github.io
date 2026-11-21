@@ -12,7 +12,7 @@ import { getLang, homeHref, useT } from '../i18n';
 const lang = getLang(Astro.url);
 const t = useT(lang);
 
-const tools = await getTools();
+const tools = await getTools(lang);
 ---
 
 <section class="wrap pt-10 pb-20 sm:pt-12 sm:pb-24">

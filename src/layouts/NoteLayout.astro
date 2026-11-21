@@ -25,7 +25,7 @@ const sections = headings.filter((h) => h.depth === 2);
 <BaseLayout title={title} description={summary}>
   <article class="wrap pt-10 pb-20 sm:pt-12">
     <a
-      href={withBase('/notas/')}
+      href={withBase(lang === 'en' ? '/en/notas/' : '/notas/')}
       class="inline-flex items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-accent"
     >
       <Icon name="arrow-left" size={14} /> {t('notes.kicker')}

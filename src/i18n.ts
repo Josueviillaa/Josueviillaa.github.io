@@ -42,8 +42,7 @@ function logicalPath(url: URL): string {
  * de un writeup (solo español) lleva al listado del otro idioma.
  */
 export function switchHref(url: URL, target: Lang): string {
-  let logical = logicalPath(url);
-  logical = logical.replace(/^(writeups|notas|herramientas)\/.+$/, '$1/');
+  const logical = logicalPath(url);
   const prefix = target === 'en' ? 'en/' : '';
   return withBase(`/${prefix}${logical}`);
 }
@@ -159,6 +158,16 @@ const ui = {
 
     'card.read': 'leer writeup',
     'card.techniques': 'Técnicas',
+
+    'writeup.retired': 'máquina retirada',
+    'writeup.active': 'máquina activa',
+    'writeup.os': 'SO',
+    'writeup.difficulty': 'dificultad',
+    'writeup.ports': 'puertos',
+    'writeup.published': 'publicado',
+    'writeup.phases': 'fases',
+    'writeup.footer':
+      'Contenido con fines educativos sobre una máquina de {platform}, resuelta en su laboratorio autorizado. Se explican los conceptos de cada vector; no se publican credenciales ni payloads listos para usar. No apliques estas técnicas contra sistemas sin permiso explícito.',
 
     'cert.flags': 'flags capturadas',
     'cert.of': 'de',
@@ -288,6 +297,16 @@ const ui = {
 
     'card.read': 'read writeup',
     'card.techniques': 'Techniques',
+
+    'writeup.retired': 'retired machine',
+    'writeup.active': 'active machine',
+    'writeup.os': 'OS',
+    'writeup.difficulty': 'difficulty',
+    'writeup.ports': 'ports',
+    'writeup.published': 'published',
+    'writeup.phases': 'phases',
+    'writeup.footer':
+      'Educational content about a {platform} machine, solved in its authorized lab. The concepts behind each vector are explained; no credentials or ready-to-use payloads are published. Do not use these techniques against systems without explicit permission.',
 
     'cert.flags': 'flags captured',
     'cert.of': 'of',

@@ -1,8 +1,8 @@
 ---
 /** Command palette (Ctrl/Cmd+K): buscar y navegar con búsqueda difusa. */
-import { getWriteups } from '../lib/writeups';
-import { getNotes } from '../lib/notes';
-import { getTools } from '../lib/tools';
+import { getWriteups, writeupSlug } from '../lib/writeups';
+import { getNotes, noteSlug } from '../lib/notes';
+import { getTools, toolSlug } from '../lib/tools';
 import { withBase } from '../lib/url';
 import { getLang, useT, homeHref } from '../i18n';
 import { githubUrl, linkedinUrl, htbUrl } from '../config/site';
@@ -12,7 +12,11 @@ const t = useT(lang);
 const home = homeHref(lang);
 const p = (path: string) => withBase(lang === 'en' ? `/en${path}` : path);
 
-const [writeups, notes, tools] = await Promise.all([getWriteups(), getNotes(), getTools()]);
+const [writeups, notes, tools] = await Promise.all([getWriteups(lang), getNotes(lang), getTools(lang)]);
+const detail = (section: string, id: string) => {
+  const slug = section === 'writeups' ? writeupSlug(id) : section === 'notas' ? noteSlug(id) : toolSlug(id);
+  return withBase(lang === 'en' ? `/en/${section}/${slug}/` : `/${section}/${slug}/`);
+};
 
 type Item = { label: string; href: string; kind: string; keywords?: string; external?: boolean };
 
@@ -25,9 +29,9 @@ const items: Item[] = [
   { label: t('nav.notes'), href: p('/notas/'), kind: 'page' },
   { label: t('nav.tools'), href: p('/herramientas/'), kind: 'page' },
   { label: t('stats.title'), href: p('/stats/'), kind: 'page' },
-  ...writeups.map((e) => ({ label: e.data.title, href: withBase(`/writeups/${e.id}/`), kind: 'writeup', keywords: e.data.tags.join(' ') })),
-  ...notes.map((e) => ({ label: e.data.title, href: withBase(`/notas/${e.id}/`), kind: 'note', keywords: e.data.tags.join(' ') })),
-  ...tools.map((e) => ({ label: e.data.title, href: withBase(`/herramientas/${e.id}/`), kind: 'tool' })),
+  ...writeups.map((e) => ({ label: e.data.title, href: detail('writeups', e.id), kind: 'writeup', keywords: e.data.tags.join(' ') })),
+  ...notes.map((e) => ({ label: e.data.title, href: detail('notas', e.id), kind: 'note', keywords: e.data.tags.join(' ') })),
+  ...tools.map((e) => ({ label: e.data.title, href: detail('herramientas', e.id), kind: 'tool' })),
   { label: 'GitHub', href: githubUrl, kind: 'link', external: true },
   { label: 'LinkedIn', href: linkedinUrl, kind: 'link', external: true },
   { label: 'HackTheBox', href: htbUrl, kind: 'link', external: true },

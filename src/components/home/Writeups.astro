@@ -11,7 +11,7 @@ const t = useT(lang);
 
 // En la home mostramos solo las más recientes; el resto, en /writeups/.
 const LIMIT = 3;
-const writeups = await getWriteups();
+const writeups = await getWriteups(lang);
 const shown = writeups.slice(0, LIMIT);
 const indexHref = withBase(lang === 'en' ? '/en/writeups/' : '/writeups/');
 ---

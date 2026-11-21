@@ -1,0 +1,61 @@
+---
+title: "MSSQL SMK Decrypt"
+summary: "PowerShell script that recovers the credentials stored in a Microsoft SQL Server by decrypting its DPAPI-protected Service Master Key."
+date: 2026-11-12
+language: "PowerShell"
+download: "/tools/mssql-smk-decrypt.ps1"
+repo: "https://github.com/Josueviillaa/Josueviillaa.github.io/blob/main/public/tools/mssql-smk-decrypt.ps1"
+tags: ["mssql", "dpapi", "credentials", "post-exploitation", "windows", "powershell"]
+draft: false
+---
+
+SQL Server stores the passwords of its **credentials** and **linked servers** encrypted, but **reversibly**: anyone with enough access to the host can recover them in clear text. I wrote this utility after fighting for days with the last step of that chain —a Windows-encryption detail that made every public script fail— and I'm leaving it documented here.
+
+## What it solves
+
+A SQL Server that stores credentials (for example to reach other services or linked servers) encrypts them with **AES**, using a key derived from the instance's **Service Master Key** (SMK). The SMK, in turn, is protected with machine-level **DPAPI**. The chain to recover a secret in clear text is:
+
+1. Open the **DAC** (Dedicated Admin Connection) over loopback to read internal tables.
+2. Extract the encrypted SMK from `sys.key_encryptions`.
+3. Decrypt the SMK with **DPAPI**, using the entropy the service keeps in the registry.
+4. Take the last 32 bytes as the **AES-256** key and decrypt each credential (**CBC** mode, **UTF-16LE** text).
+
+## The detail that made it fail
+
+Every script I tried decrypted the SMK by passing the blob as-is to `ProtectedData.Unprotect` — and it failed with a cryptic *"the data is invalid"*.
+
+The reason: SQL Server **prepends its own header** of several bytes before the real DPAPI blob. A DPAPI blob always starts with the *magic* `01 00 00 00 D0 8C 9D DF`; you have to **locate it and trim everything before it** before decrypting.
+
+```powershell
+# Find the DPAPI magic inside the field and trim SQL's header.
+$off = -1
+for ($i = 0; $i -le $smk.Length - 8; $i++) {
+    if ($smk[$i]   -eq 0x01 -and $smk[$i+4] -eq 0xd0 -and
+        $smk[$i+5] -eq 0x8c -and $smk[$i+6] -eq 0x9d -and $smk[$i+7] -eq 0xdf) {
+        $off = $i; break
+    }
+}
+[byte[]]$blob = $smk[$off..($smk.Length - 1)]
+$key = [Security.Cryptography.ProtectedData]::Unprotect($blob, $ent, 'LocalMachine')
+```
+
+With the header trimmed, `Unprotect` returns the SMK and the rest of the chain works.
+
+## Usage
+
+Run it **on the SQL Server host itself**, with local administrator privileges (or those of the SQL service account). The only parameter is the instance name exactly as it appears in the registry:
+
+```powershell
+# Default instance
+.\mssql-smk-decrypt.ps1 -InstanceName "MSSQL17.MSSQLSERVER"
+```
+
+For each stored credential it returns the name, the user and the clear-text password. The full script is in the download button and on GitHub.
+
+<Callout type="warning">
+This is a legitimate post-exploitation technique in a pentest, but it recovers real secrets. Use it **only** on your own systems or with explicit written authorization.
+</Callout>
+
+## Mitigation
+
+From the defensive side: limit who can open the DAC and reach the SQL host, avoid storing high-privilege credentials inside SQL Server itself, and, where possible, use integrated authentication (managed service accounts) instead of credentials with a stored password.

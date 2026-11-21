@@ -1,9 +1,12 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
+import type { Lang } from '../i18n';
+import { pickLang, baseSlug } from './content-lang';
 
 export type Note = CollectionEntry<'notes'>;
+export { baseSlug as noteSlug };
 
-/** Notas publicadas, de la más reciente a la más antigua. Los borradores solo se ven en dev. */
-export async function getNotes(): Promise<Note[]> {
+/** Notas del idioma pedido (inglés con fallback al español), recientes primero. */
+export async function getNotes(lang: Lang = 'es'): Promise<Note[]> {
   const entries = await getCollection('notes', ({ data }) => import.meta.env.DEV || !data.draft);
-  return entries.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+  return pickLang(entries, lang).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
 }

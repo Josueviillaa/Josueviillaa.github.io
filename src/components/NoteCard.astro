@@ -3,7 +3,7 @@ import Icon from './Icon.astro';
 import { formatDate } from '../lib/writeups';
 import { withBase } from '../lib/url';
 import { getLang, useT } from '../i18n';
-import type { Note } from '../lib/notes';
+import { noteSlug, type Note } from '../lib/notes';
 
 interface Props {
   entry: Note;
@@ -15,10 +15,12 @@ const MAX_TAGS = 5;
 
 const lang = getLang(Astro.url);
 const t = useT(lang);
+const slug = noteSlug(entry.id);
+const href = withBase(lang === 'en' ? `/en/notas/${slug}/` : `/notas/${slug}/`);
 ---
 
 <a
-  href={withBase(`/notas/${entry.id}/`)}
+  href={href}
   class="group flex h-full flex-col rounded-lg border border-line bg-surface p-5 transition duration-200 hover:-translate-y-1 hover:border-accent/60 hover:shadow-lg hover:shadow-black/30 sm:p-6"
 >
   <p class="font-mono text-xs text-faint"><span class="text-accent">#</span> {topic}</p>

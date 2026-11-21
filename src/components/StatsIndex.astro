@@ -1,7 +1,7 @@
 ---
 import Icon from './Icon.astro';
 import StatBars from './StatBars.astro';
-import { getWriteups } from '../lib/writeups';
+import { getWriteups, writeupSlug } from '../lib/writeups';
 import { getStats } from '../lib/stats';
 import { attack } from '../data/attack';
 import { withBase } from '../lib/url';
@@ -10,10 +10,14 @@ import { getLang, useT, homeHref } from '../i18n';
 const lang = getLang(Astro.url);
 const t = useT(lang);
 
-const stats = await getStats();
-const writeups = await getWriteups();
+const stats = await getStats(lang);
+const writeups = await getWriteups(lang);
 const wmap = Object.fromEntries(
-  writeups.map((w) => [w.id, { title: w.data.title, href: withBase(`/writeups/${w.id}/`) }]),
+  writeups.map((w) => {
+    const slug = writeupSlug(w.id);
+    const href = withBase(lang === 'en' ? `/en/writeups/${slug}/` : `/writeups/${slug}/`);
+    return [slug, { title: w.data.title, href }];
+  }),
 ) as Record<string, { title: string; href: string }>;
 
 const tiles = [

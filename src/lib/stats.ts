@@ -1,5 +1,6 @@
 import { getWriteups } from './writeups';
 import { site } from '../config/site';
+import type { Lang } from '../i18n';
 
 const osFamily = (os: string) => (os.toLowerCase().startsWith('windows') ? 'Windows' : 'Linux');
 const tally = (arr: string[]) => arr.reduce<Record<string, number>>((m, k) => ((m[k] = (m[k] || 0) + 1), m), {});
@@ -17,8 +18,8 @@ export interface Stats {
 }
 
 /** Agrega estadísticas de los writeups publicados (para la home y /stats). */
-export async function getStats(): Promise<Stats> {
-  const writeups = await getWriteups();
+export async function getStats(lang: Lang = 'es'): Promise<Stats> {
+  const writeups = await getWriteups(lang);
 
   const osData = (Object.entries(tally(writeups.map((w) => osFamily(w.data.os)))) as Row[]).sort((a, b) => b[1] - a[1]);
 

@@ -1,0 +1,35 @@
+---
+import { render } from 'astro:content';
+import WriteupLayout from '../../../layouts/WriteupLayout.astro';
+import Terminal from '../../../components/writeup/Terminal.astro';
+import Lesson from '../../../components/writeup/Lesson.astro';
+import Callout from '../../../components/Callout.astro';
+import AttackChain from '../../../components/writeup/AttackChain.astro';
+import { getWriteups, writeupSlug, type Writeup } from '../../../lib/writeups';
+
+type Neighbour = { id: string; title: string } | null;
+
+export async function getStaticPaths() {
+  const entries = await getWriteups('en');
+  return entries.map((entry, i) => {
+    const toNb = (e?: Writeup): Neighbour => (e ? { id: e.id, title: e.data.title } : null);
+    return {
+      params: { slug: writeupSlug(entry.id) },
+      props: { entry, prev: toNb(entries[i - 1]), next: toNb(entries[i + 1]) },
+    };
+  });
+}
+
+interface Props {
+  entry: Writeup;
+  prev: Neighbour;
+  next: Neighbour;
+}
+
+const { entry, prev, next } = Astro.props;
+const { Content, headings } = await render(entry);
+---
+
+<WriteupLayout entry={entry} headings={headings} prev={prev} next={next}>
+  <Content components={{ Terminal, Lesson, Callout, AttackChain }} />
+</WriteupLayout>

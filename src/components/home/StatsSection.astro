@@ -8,7 +8,7 @@ import { getLang, useT } from '../../i18n';
 
 const lang = getLang(Astro.url);
 const t = useT(lang);
-const stats = await getStats();
+const stats = await getStats(lang);
 const href = withBase(lang === 'en' ? '/en/stats/' : '/stats/');
 
 const tiles = [
