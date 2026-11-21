@@ -1,0 +1,74 @@
+---
+title: "Dutybound"
+topic: "Active machine · spoiler-free"
+date: 2026-10-26
+tags: ["linux", "web", "injection", "database", "privilege-escalation"]
+summary: "Conceptual, spoiler-free notes on Dutybound: a duty-free shop kiosk. Full write-up when the machine retires."
+---
+
+<Callout type="warning">
+  **Active** machine. These notes are **spoiler-free** on purpose: no flags,
+  payloads, commands or concrete paths. The detailed write-up will be published
+  when the box retires.
+</Callout>
+
+## What it's about
+
+Dutybound sets up the storefront of an **airport duty-free shop**: a shopping
+cart and a checkout flow that, before you pay, "scans" a boarding pass to decide
+your tax situation. Almost all of the interesting surface revolves around **how
+the backend interprets that boarding pass** and what it does afterwards with
+what it extracts from it.
+
+## The path, in concepts
+
+Without going into the how, the route touched four ideas I found very
+instructive:
+
+- **Reversing a proprietary format blind.** The server expects a strict,
+  structured data format. There's no documentation for the parser: I rebuilt it
+  **using its own error messages as a compass**, satisfying it field by field
+  until I mapped the whole structure.
+- **Misplaced trust in client data.** A "business" decision the server treated as
+  trustworthy turned out to derive from data the client controls 100%. A classic
+  *broken access control* once you think about it, but well hidden behind layers
+  of parsing.
+- **Jumping from one layer to another.** A flaw in one layer of the application
+  ended up giving execution in a completely different layer of the stack. The
+  lesson: follow the data to where it crosses a **trust boundary**.
+- **Lateral movement and escalation by design, not by CVE.** Neither foothold nor
+  root came from a public exploit: they were **misconfigurations and design
+  mistakes** (trust, permissions, session exposure). Enumerating beat assuming,
+  every time.
+
+## Takeaways
+
+- **Don't marry the narrative that "fits".** I chased a vector that made perfect
+  thematic sense... and it was a dead end. Stopping to **verify and discard it**
+  before investing more time was what unblocked the box. The nice hypothesis is
+  not evidence.
+- **Error messages are free documentation.** A verbose parser draws its own
+  structure for you if you listen.
+- **"Trusted data" almost never is.** If the user can influence a value, assume
+  they will, with bad intent.
+- **Methodology matters more than the trick.** Enumerate thoroughly, map privilege
+  boundaries and follow the data: that's what solved it, not a magic one-liner.
+
+## A professional pentest mindset
+
+While solving it I kept contrasting the "quick CTF" route with how I'd do it in a
+real engagement:
+
+- Confirm findings **non-destructively** before going for execution.
+- **Minimise impact**: prefer reading/extracting over modifying, and back up any
+  file that does have to be touched.
+- **Document every boundary crossed** (what data, from where, to where) as an
+  independent finding, even if they form a single chain.
+- **Cleanup**: leave no artifacts (binaries, modified files) after the PoC.
+
+---
+
+<Callout type="info">
+  Full write-up with the technical chain when Dutybound retires. If you want to
+  comment on anything in the meantime, drop me a line.
+</Callout>

@@ -1,0 +1,101 @@
+---
+title: "PHP2Shell: from Out-Of-Memory to shell"
+topic: "Memory exploitation"
+date: 2026-11-05
+tags: ["php", "memory-corruption", "cve-2026-109618", "cve-2026-109619", "rce", "aslr", "dfir", "apache"]
+summary: "How two bugs in the PHP core (PHP2Shell) chain together into remote code execution: worker pinning, a forced Out-Of-Memory, reuse of corrupted state across requests, an address leak to defeat ASLR, and heap grooming. And, from the defensive side, how it looks and how to detect it."
+---
+
+**PHP2Shell** is the nickname for a pair of critical vulnerabilities in the **PHP core** (not in any application), disclosed in October 2026. The interesting part isn't a single spectacular bug, but **how two small flaws** —neither exploitable on its own— **chain into a remote shell**. This note explains the **mechanism**, not the solution to any challenge.
+
+<Callout type="note">
+I ran into this technique while analysing my first Sherlock (HackTheBox's DFIR lab) — my first serious contact with the defensive side. A nice detail of that challenge: the name hid the clue, *d**OOM**s Day* → **OOM**, *Out Of Memory*, the trigger for everything.
+</Callout>
+
+## The two CVEs
+
+| CVE | What it does | Role in the chain |
+|---|---|---|
+| **CVE-2026-109618** | If PHP runs out of memory mid-request, it leaves internal structures half-initialised and later treats them as valid | **Corrupts**: the attacker forces the OOM on purpose |
+| **CVE-2026-109619** | A request's internal state survives the freeing of its memory, and the next request on the same worker reuses it | **Reuses** the corruption on the following request |
+
+Neither one gives RCE on its own: together they provide a **memory-corruption primitive**. Turning it into a shell takes three more techniques —*worker pinning*, a *leak* to defeat ASLR and *heap grooming*— which is where the real work of the exploit lives. The full patches shipped in PHP 8.5.12, 8.4.27, 8.3.36 and 8.2.35.
+
+<AttackChain
+  tag="PHP2Shell"
+  label="from OOM to shell"
+  steps={[
+    { title: 'Worker pinning', desc: 'Slow multipart uploads that never finish (Slowloris-style) tie up every Apache worker but one, forcing the attacker\'s requests to always land on the same process.', action: 'force an Out-Of-Memory on that worker' },
+    { title: 'OOM → corruption (CVE-2026-109618)', desc: 'By exhausting memory_limit mid-request, PHP leaves half-filled structures and then treats them as valid.', action: 'the next request inherits the state' },
+    { title: 'Cross-request reuse (CVE-2026-109619)', desc: 'The corrupted state survives the memory being freed; the next request on the same worker reuses it.', action: 'heap pointer leak' },
+    { title: 'Defeat ASLR', desc: 'A controlled heap spray surfaces real process addresses (e.g. inside an oversized cookie), revealing the memory layout.', action: 'heap grooming' },
+    { title: 'Heap grooming → execution control', desc: 'With the addresses known, the heap is shaped to place the payload and point execution at it.', action: 'reverse shell' },
+    { title: 'RCE', desc: 'The corruption primitive becomes code execution: the server opens a connection back to the attacker.', tone: 'win' },
+  ]}
+/>
+
+## The chain, step by step
+
+### Worker pinning
+
+CVE-2026-109619 only works if **two consecutive requests land on the same worker process**. On Apache with `mpm_prefork` there is a pool of processes (default `MaxRequestWorkers 150` on Debian) and the balancer spreads requests across them. To control it, the attacker **ties up every worker but one**: they open dozens of `multipart/form-data` uploads **that never finish** —sending `chunked` pieces very slowly and never sending the final chunk or the boundary close. It's the same idea as *Slowloris*: each connection keeps a worker blocked waiting for data.
+
+With the pool saturated, only one process is free and **all** the attacker's requests land on it. Now they have a stable channel across requests.
+
+### Forcing the Out-Of-Memory
+
+On that worker, the attacker sends a request designed to exhaust memory: huge bodies that go past PHP's `memory_limit` (default **128 MB**). PHP aborts the request midway —and that's where **CVE-2026-109618** leaves internal structures half-initialised that the engine later assumes are fine.
+
+<Callout type="tip">
+If `display_errors` is on, the `Allowed memory size of N bytes exhausted` message is shown **to the attacker** in the response, confirming the OOM fired. In production it must always go to a log, never to the client.
+</Callout>
+
+### Reusing the corruption
+
+The next request on that same worker (CVE-2026-109619) **reuses** the corrupted state: what should have been freed is still alive and gets reinterpreted. It's a variant of the classic *use-after-free*, but at the level of PHP's request state rather than a stray pointer.
+
+### Defeating ASLR with a leak
+
+To aim a payload you need to know **where** the process memory is, and ASLR randomises it at every start. The attacker does a **heap spray** with known markers (repeated sequences) and, using the primitive, gets the process to **hand back chunks of its own memory** between those markers — typically inside an oversized value, like a session cookie hundreds of kilobytes long.
+
+Between the markers appear **real heap pointers** (in *little-endian*): consecutive addresses that give away the layout. With that, ASLR stops protecting.
+
+<Callout type="warning">
+When decoding that kind of dump there are two classic traps: treating it as UTF-8 **corrupts it silently** (you have to force `latin-1` / raw bytes), and remember that a space usually arrives as `+` in URL-encoding. One wrong byte and the pointer you thought you read isn't the real one.
+</Callout>
+
+### Heap grooming → execution
+
+With the addresses in hand, the last step is to **shape the heap** (*grooming*): placing objects of just the right size so that, when the corrupted structure is reused, execution points at the attacker's payload. The result is code execution in the web server context (`www-data`), which usually materialises as a **reverse shell**: the server opens an **outbound** connection to the attacker.
+
+<Callout type="note">
+Memory exploitation is **unstable**: it's common for the worker to die with a *segmentation fault* after (or during) the attack. In practice the attacker relaunches the exploit several times until one attempt holds long enough to act.
+</Callout>
+
+## How it looks from the defensive side
+
+The value of understanding the mechanism is that each step **leaves a detectable trace**, even if you don't know the CVE:
+
+- **Many long-lived multipart uploads from one IP that never complete.** The worker pool drains: even before the RCE, it's a very anomalous slow-*DoS* pattern.
+- **`Allowed memory size … exhausted` messages** in the traffic or logs: someone is blowing the `memory_limit` on purpose.
+- **Apache child processes dying with `Segmentation fault` (AH00052).** A healthy web server doesn't segfault; it's the **symptom** of the corruption, detectable without knowing the cause.
+- **Responses with giant cookies and binary bytes.** A `Set-Cookie` that doesn't look like a session id is a sign of a memory *leak* — which is why it's worth inspecting the **responses** too, not just the requests.
+- **The web server initiating outbound connections** (e.g. to a port like `4444`). A web server **receives** connections, it doesn't start them: an outbound one is almost always a shell.
+
+## Detection and mitigation
+
+| Problem | Mitigation / detection |
+|---|---|
+| Vulnerable PHP version | Update to the patched branch (8.5.12 / 8.4.27 / 8.3.36 / 8.2.35 or higher): it's the only complete fix |
+| Slow uploads that pin the worker pool | `mod_reqtimeout` for slow bodies; per-IP connection limits; alert on long connections that never complete |
+| `display_errors` enabled | `display_errors = Off` in production; errors only to the log |
+| Memory leak in responses | Monitor anomalous `Set-Cookie`/header sizes and formats |
+| Outbound reverse shell | *Egress filtering*: a web server shouldn't initiate outbound connections |
+| Workers dying from segfault | Alert on `Segmentation fault` in Apache's parent-process log |
+| `mod_dumpio` or other debug modules | Don't enable them outside debugging; their log is sensitive evidence (it stores cookies and passwords in clear text) |
+
+## Takeaways
+
+- **Two "minor" bugs chained** are worth more than an isolated critical one: the surface of a real exploit is almost never a single CVE.
+- **A flaw in the *core*** (PHP, not the app) affects everything running on top: there's no "secure code" that saves you from a corruption primitive in the engine.
+- **The offensive and defensive sides are the same knowledge seen from two chairs:** understanding *worker pinning*, OOM, UAF and heap grooming is what lets you, as an analyst, recognise the attack by its traces (stuck uploads, OOM, segfaults, giant cookies, egress to `:4444`) without knowing the vulnerability beforehand.
