@@ -1,0 +1,122 @@
+---
+title: "Searcher"
+platform: "HackTheBox"
+os: "Linux (Ubuntu)"
+difficulty: "easy"
+ports: [22, 80]
+date: 2026-10-15
+tags:
+  - "Flask"
+  - "eval injection"
+  - "RCE"
+  - "credential reuse"
+  - "git leak"
+  - "sudo"
+  - "path hijacking"
+  - "Docker"
+summary: "A chain of four linked oversights: an outdated library with an unsafe eval(), an unvalidated parameter, credentials in a .git/config, and a sudo script that invokes another by relative path."
+retired: true
+---
+
+> **Notice.** Educational content about a **retired** HackTheBox machine.
+> It explains the *concept* of each vector, with no real credentials or
+> copy-paste-ready payloads.
+
+Searcher isn't won with a spectacular exploit, but by **chaining small
+oversights** until you reach full control of the system. It wasn't magic: it was
+method. That, to me, is the machine's most valuable lesson.
+
+<AttackChain
+  label="Attack chain · from a library version to root"
+  steps={[
+    { title: 'Recon · Searchor 2.4.0', desc: 'The footer reveals the library and its version, with an unsafe eval().', action: 'injection in the search parameter' },
+    { title: 'Foothold · RCE', desc: 'User input reaches eval() → execution as the web service user.', action: 'secret in .git/config' },
+    { title: 'User', desc: 'Credentials embedded in the Git repo, reused by a system user.', action: 'sudo -l: script with a relative path' },
+    { title: 'Root', desc: 'PATH hijacking of a binary invoked without an absolute path in a sudo script.', tone: 'win' },
+  ]}
+/>
+
+## Reconnaissance — Reading what the server hands you
+
+Nmap showed only two open ports. The web server ran Apache, but underneath peeked
+`Werkzeug/Python` — the unmistakable signature of a **Flask** application.
+
+```text
+80/tcp open http    Apache httpd 2.4.52 (Ubuntu)
+└─ Werkzeug/2.1.2 Python/3.10.6
+```
+
+The application was a search tool. And in the footer, the site confessed its own
+stack: *"Powered by Flask and Searchor 2.4.0"*. The exact name and version of the
+component, served on a plate.
+
+> **Lesson.** Fingerprinting doesn't always need sophisticated tools. Sometimes
+> the vulnerable component and its version are written in the footer. Read before
+> you attack.
+
+## Foothold — When a library evaluates your input
+
+Searchor 2.4.0 carried a known vulnerability: it built search URLs using `eval()`
+in an unsafe way. If your input reaches an `eval()`… it reaches code execution.
+
+The interesting detail is that the application **validated** the `engine`
+parameter against a closed list, but the `query` parameter was open territory.
+Injecting in the right parameter got remote command execution and, from there, a
+reverse shell.
+
+> **Lesson.** `eval()` on user input is one of the most dangerous antipatterns in
+> development. And never assume all of a request's parameters are validated
+> equally: one that slips past the filter is enough.
+
+## Lateral movement — Secrets live in the silliest places
+
+Once inside, a git repository appeared in the application directory. The
+`.git/config` file held the remote URL… with the credentials embedded in plain
+text:
+
+```text
+[remote "origin"]
+    url = http://user:password@gitea.searcher.htb/…
+```
+
+That password was **reused** by the system user. An almost free user hop.
+
+> **Lesson.** Credential reuse is still one of the most effective attack paths in
+> the real world. And git repositories leak secrets constantly: `.git/config`,
+> the commit history, loose objects.
+
+## Escalation to root — The danger of relative paths
+
+The user could run a Python script as root via `sudo`. That script, among its
+functions, invoked another script (`full-checkup.sh`) using a **relative path**
+instead of an absolute one.
+
+The consequence: by creating my own `full-checkup.sh` in a writable directory and
+launching the command from there, the privileged script ran **my** code… as root.
+
+```text
+$ cd /tmp && echo 'chmod u+s /bin/bash' > full-checkup.sh
+$ sudo /usr/bin/python3 /opt/scripts/system-checkup.py full-checkup
+uid=0(root) gid=0(root) groups=0(root)
+```
+
+> **Lesson.** Any privileged program must invoke binaries and scripts with
+> **absolute paths**. A relative path run in a root context is an open invitation
+> to privilege escalation.
+
+## Final reflection
+
+| Phase | Vector |
+| --- | --- |
+| Recon | Apache + Werkzeug/Flask + Searchor 2.4.0 (revealed in the footer) |
+| Foothold | Unsafe `eval()` in Searchor 2.4.0 → RCE |
+| User | Credentials in `.git/config` → reused by the system user |
+| Root | `sudo` over a Python script → path hijacking via relative path |
+
+Four oversights that look minor on their own — outdated library, incomplete
+validation, plain-text secret, relative path — add up to full compromise. That's
+how real compromises work: there's no silver bullet, there's the accumulation of
+small mistakes.
+
+Every machine reminds me why security is both offensive and defensive:
+understanding how something breaks is the first step to knowing how to protect it.
