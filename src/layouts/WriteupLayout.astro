@@ -4,7 +4,8 @@ import BaseLayout from './BaseLayout.astro';
 import DifficultyBadge from '../components/DifficultyBadge.astro';
 import Icon from '../components/Icon.astro';
 import WriteupPager from '../components/writeup/WriteupPager.astro';
-import { formatDate, type Writeup } from '../lib/writeups';
+import { formatDate, getWriteups, writeupSlug, type Writeup } from '../lib/writeups';
+import { readingTime } from '../lib/reading';
 import { withBase } from '../lib/url';
 import { getLang, useT } from '../i18n';
 
@@ -23,6 +24,19 @@ const t = useT(lang);
 
 // Cada "## " del writeup es una fase
 const phases = headings.filter((h) => h.depth === 2);
+
+// Tiempo de lectura estimado (solo prosa).
+const readMin = readingTime(entry.body);
+
+// Writeups relacionados: los que más tags comparten (mismo idioma, excluyendo este).
+const selfSlug = writeupSlug(entry.id);
+const selfTags = new Set(tags.map((x) => x.toLowerCase()));
+const related = (await getWriteups(lang))
+  .filter((w) => writeupSlug(w.id) !== selfSlug)
+  .map((w) => ({ w, score: w.data.tags.reduce((n, x) => n + (selfTags.has(x.toLowerCase()) ? 1 : 0), 0) }))
+  .filter((r) => r.score > 0)
+  .sort((a, b) => b.score - a.score || b.w.data.date.getTime() - a.w.data.date.getTime())
+  .slice(0, 3);
 ---
 
 <BaseLayout title={`${title} · writeup`} description={summary}>
@@ -37,6 +51,7 @@ const phases = headings.filter((h) => h.depth === 2);
     <header class="mt-8 border-b border-line pb-10">
       <p class="font-mono text-xs text-faint">
         {platform} <span class="text-line-strong">/</span> {retired ? t('writeup.retired') : t('writeup.active')}
+        <span class="text-line-strong">·</span> ~{readMin} {t('read.unit')}
       </p>
       <h1 class="mt-3 text-5xl font-bold sm:text-6xl">{title}</h1>
       <p class="mt-4 max-w-2xl text-lg text-muted">{summary}</p>
@@ -133,6 +148,36 @@ const phases = headings.filter((h) => h.depth === 2);
         <slot />
       </div>
     </div>
+
+    {
+      related.length > 0 && (
+        <section class="mt-14 border-t border-line pt-8">
+          <p class="font-mono text-xs text-faint">{t('writeup.related')}</p>
+          <ul class="mt-4 grid gap-4 sm:grid-cols-3">
+            {related.map(({ w }) => {
+              const rs = writeupSlug(w.id);
+              const rhref = withBase(lang === 'en' ? `/en/writeups/${rs}/` : `/writeups/${rs}/`);
+              return (
+                <li>
+                  <a
+                    href={rhref}
+                    class="group flex h-full flex-col gap-2 rounded-lg border border-line bg-surface p-4 transition-colors hover:border-accent/60"
+                  >
+                    <span class="flex items-center justify-between gap-2">
+                      <span class="font-mono text-[0.6875rem] text-faint">
+                        {w.data.platform} · {w.data.os}
+                      </span>
+                      <DifficultyBadge level={w.data.difficulty} />
+                    </span>
+                    <span class="font-semibold text-text transition-colors group-hover:text-accent">{w.data.title}</span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )
+    }
 
     <WriteupPager prev={prev} next={next} />
 

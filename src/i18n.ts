@@ -158,6 +158,7 @@ const ui = {
 
     'card.read': 'leer writeup',
     'card.techniques': 'Técnicas',
+    'read.unit': 'min de lectura',
 
     'writeup.retired': 'máquina retirada',
     'writeup.active': 'máquina activa',
@@ -166,6 +167,7 @@ const ui = {
     'writeup.ports': 'puertos',
     'writeup.published': 'publicado',
     'writeup.phases': 'fases',
+    'writeup.related': 'Relacionados',
     'writeup.footer':
       'Contenido con fines educativos sobre una máquina de {platform}, resuelta en su laboratorio autorizado. Se explican los conceptos de cada vector; no se publican credenciales ni payloads listos para usar. No apliques estas técnicas contra sistemas sin permiso explícito.',
 
@@ -297,6 +299,7 @@ const ui = {
 
     'card.read': 'read writeup',
     'card.techniques': 'Techniques',
+    'read.unit': 'min read',
 
     'writeup.retired': 'retired machine',
     'writeup.active': 'active machine',
@@ -305,6 +308,7 @@ const ui = {
     'writeup.ports': 'ports',
     'writeup.published': 'published',
     'writeup.phases': 'phases',
+    'writeup.related': 'Related',
     'writeup.footer':
       'Educational content about a {platform} machine, solved in its authorized lab. The concepts behind each vector are explained; no credentials or ready-to-use payloads are published. Do not use these techniques against systems without explicit permission.',
 
