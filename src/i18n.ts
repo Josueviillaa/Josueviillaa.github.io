@@ -159,6 +159,8 @@ const ui = {
     'card.read': 'leer writeup',
     'card.techniques': 'Técnicas',
     'read.unit': 'min de lectura',
+    'cv.nav': 'CV',
+    'cv.download': 'Descargar CV',
 
     'writeup.retired': 'máquina retirada',
     'writeup.active': 'máquina activa',
@@ -300,6 +302,8 @@ const ui = {
     'card.read': 'read writeup',
     'card.techniques': 'Techniques',
     'read.unit': 'min read',
+    'cv.nav': 'CV',
+    'cv.download': 'Download CV',
 
     'writeup.retired': 'retired machine',
     'writeup.active': 'active machine',

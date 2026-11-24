@@ -39,6 +39,7 @@ const cfg = {
     writeups: p('/writeups/'),
     notes: p('/notas/'),
     tools: p('/herramientas/'),
+    cv: p('/cv/'),
     about: `${home}#sobre-mi`,
     skills: `${home}#skills`,
     certs: `${home}#certificaciones`,
@@ -52,7 +53,7 @@ const L =
         hint: 'type <b>help</b> and press enter',
         notFound: 'command not found: ',
         help: 'available commands',
-        cv: 'CV (PDF) coming soon. In the meantime, my LinkedIn:',
+        cv: 'My CV — view online or download as PDF:',
         themeUsage: 'usage: theme &lt;green|cyan|blue|pink|red|grey&gt;',
         themeOk: 'accent changed to ',
         sudo: "nice try \u{1F60F} — no root for you here",
@@ -81,7 +82,7 @@ const L =
         hint: 'escribe <b>help</b> y pulsa enter',
         notFound: 'comando no encontrado: ',
         help: 'comandos disponibles',
-        cv: 'CV (PDF): próximamente. Mientras tanto, mi LinkedIn:',
+        cv: 'Mi CV — verlo online o descargar en PDF:',
         themeUsage: 'uso: theme &lt;green|cyan|blue|pink|red|grey&gt;',
         themeOk: 'acento cambiado a ',
         sudo: "buen intento \u{1F60F} — aquí no hay root que valga",
@@ -279,7 +280,7 @@ const L =
           } else out(`<p class="text-faint">${L.themeUsage}</p>`);
           break;
         case 'cv':
-          out(`<p class="text-faint">${L.cv} ${link(cfg.links.linkedin, 'linkedin', true)}</p>`);
+          out(`<p class="text-faint">${L.cv}</p><p>→ ${link(cfg.nav.cv, 'cv', false)}</p>`);
           break;
         case 'banner':
           out(`<pre class="text-accent">~/${esc(cfg.handle)}</pre>`);

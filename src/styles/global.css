@@ -128,6 +128,26 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Capa de curvas de nivel (topográfico) teñida con el acento: se enmascara
+     el SVG con el color de acento, así sigue el rotador de tema. Fija y detrás
+     del contenido; el gradiente del body asoma entre los contornos. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: var(--accent);
+    -webkit-mask: url("/topo.svg") center / cover no-repeat;
+    mask: url("/topo.svg") center / cover no-repeat;
+    opacity: 0.13;
+  }
+
+  /* El fondo topográfico es decorativo: nunca en impresión (PDF del CV limpio). */
+  @media print {
+    body::before { display: none !important; }
+  }
+
   h1, h2, h3, h4 {
     font-family: var(--font-display);
     line-height: 1.15;

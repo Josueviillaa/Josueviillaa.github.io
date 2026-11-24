@@ -14,13 +14,15 @@ interface Props {
   title?: string;
   description?: string;
   isHome?: boolean;
+  /** Clase extra para <body> (p. ej. "is-cv" para aislar la página de CV al imprimir). */
+  bodyClass?: string;
 }
 
 const lang = getLang(Astro.url);
 const t = useT(lang);
 const c = content[lang];
 
-const { title, description = c.description, isHome = false } = Astro.props;
+const { title, description = c.description, isHome = false, bodyClass = '' } = Astro.props;
 const pageTitle = title ? `${title} · ${site.name}` : `${site.name} · ${c.role}`;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const year = new Date().getFullYear();
@@ -134,7 +136,7 @@ const personLd = {
     />
   </head>
 
-  <body id="top">
+  <body id="top" class={bodyClass}>
     <BootIntro />
     <div id="read-progress" aria-hidden="true" class="pointer-events-none fixed top-0 left-0 z-[60] h-0.5 w-full origin-left bg-accent"></div>
     <a

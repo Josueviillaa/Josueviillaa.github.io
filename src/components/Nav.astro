@@ -40,6 +40,8 @@ const items: NavItem[] = [
 const anchorHref = (id: string) => (isHome ? `#${id}` : `${home}#${id}`);
 const isActivePage = (href: string) => path.startsWith(href);
 const num = (i: number) => String(i + 1).padStart(2, '0');
+
+const cvHref = withBase(lang === 'en' ? '/en/cv/' : '/cv/');
 ---
 
 <header class="sticky top-0 z-50 border-b border-line bg-bg/85 backdrop-blur-md">
@@ -76,6 +78,18 @@ const num = (i: number) => String(i + 1).padStart(2, '0');
       </ul>
 
       <div class="flex items-center gap-2 sm:gap-3">
+        <a
+          href={cvHref}
+          aria-current={isActivePage(cvHref) ? 'page' : undefined}
+          class:list={[
+            'inline-flex h-9 items-center rounded-md border px-3 font-mono text-xs font-medium transition-colors',
+            isActivePage(cvHref)
+              ? 'border-accent bg-accent text-accent-ink'
+              : 'border-accent/50 text-accent hover:bg-accent hover:text-accent-ink',
+          ]}
+        >
+          {t('cv.nav')}
+        </a>
         <button
           type="button"
           data-cmdk-open

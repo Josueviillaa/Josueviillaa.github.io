@@ -1,0 +1,332 @@
+---
+import Icon from './Icon.astro';
+import { site, content, githubUrl, linkedinUrl, htbUrl } from '../config/site';
+import { getWriteups } from '../lib/writeups';
+import { skills } from '../data/skills';
+import { certs } from '../data/certs';
+import { withBase } from '../lib/url';
+import { getLang } from '../i18n';
+
+const lang = getLang(Astro.url);
+const c = content[lang];
+
+const writeups = await getWriteups(lang);
+const featured = writeups.slice(0, 6);
+const earned = certs.filter((cert) => cert.status === 'obtenida');
+const goals = certs.filter((cert) => cert.status !== 'obtenida').map((cert) => cert.code);
+
+const titleCase = (d: string) => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase();
+
+const copy = {
+  es: {
+    kicker: 'Currículum',
+    print: 'Descargar PDF',
+    back: 'volver al sitio',
+    summary:
+      'Pentester junior centrado en seguridad ofensiva de aplicaciones web y Active Directory. Más de 75 máquinas de HackTheBox resueltas (rango Professional) y writeups públicos donde documento cada fase, de la enumeración a la escalada de privilegios. Busco incorporarme a un equipo de red team o purple team, preferiblemente en remoto.',
+    profile: 'Perfil',
+    education: 'Formación',
+    degree: 'Máster en Ciberseguridad e Inteligencia Artificial',
+    institution: 'Evolve',
+    certsTitle: 'Certificaciones',
+    goal: 'Objetivo',
+    writeupsTitle: 'Writeups destacados',
+    skillsTitle: 'Habilidades',
+    langsTitle: 'Idiomas',
+    availTitle: 'Disponibilidad',
+    locTitle: 'Ubicación',
+    machines: 'máquinas resueltas',
+    publicWriteups: 'writeups técnicos públicos',
+    focus: 'Enfoque: web · Active Directory · Linux',
+    seeMore: 'Writeups completos y notas técnicas en',
+  },
+  en: {
+    kicker: 'Résumé',
+    print: 'Download PDF',
+    back: 'back to site',
+    summary:
+      'Junior pentester focused on offensive security for web applications and Active Directory. 75+ HackTheBox machines solved (Professional rank) and public write-ups documenting every phase, from enumeration to privilege escalation. Looking to join a red team or purple team, ideally remote.',
+    profile: 'Profile',
+    education: 'Education',
+    degree: 'MSc in Cybersecurity & AI',
+    institution: 'Evolve',
+    certsTitle: 'Certifications',
+    goal: 'Targeting',
+    writeupsTitle: 'Selected write-ups',
+    skillsTitle: 'Skills',
+    langsTitle: 'Languages',
+    availTitle: 'Availability',
+    locTitle: 'Location',
+    machines: 'machines solved',
+    publicWriteups: 'public technical write-ups',
+    focus: 'Focus: web · Active Directory · Linux',
+    seeMore: 'Full write-ups and technical notes at',
+  },
+}[lang];
+
+const siteHost = 'josueviillaa.github.io';
+const cvHome = withBase(lang === 'en' ? '/en/' : '/');
+const facts = c.facts;
+const availability = facts.find((f) => /disponib|availab/i.test(f.label))?.value ?? '';
+const location = facts.find((f) => /ubica|locat/i.test(f.label))?.value ?? '';
+const languages = facts.find((f) => /idioma|langua/i.test(f.label))?.value ?? '';
+---
+
+<div class="cv-page">
+  <div class="cv-actions cv-screen-only">
+    <a href={cvHome} class="cv-back"><Icon name="arrow-left" size={14} /> {copy.back}</a>
+    <button type="button" id="cv-print" class="cv-print">
+      <Icon name="download" size={15} /> {copy.print}
+    </button>
+  </div>
+
+  <article class="cv-doc" aria-label={copy.kicker}>
+    <header class="cv-head">
+      <div>
+        <h1 class="cv-name">{site.name} <span class="cv-handle">/ {site.handle}</span></h1>
+        <p class="cv-role">{c.role}</p>
+      </div>
+      <ul class="cv-contact">
+        <li>{location}</li>
+        <li><a href={`mailto:${site.email}`}>{site.email}</a></li>
+        <li><a href={linkedinUrl}>linkedin.com/in/{site.links.linkedin}</a></li>
+        <li><a href={githubUrl}>github.com/{site.links.github}</a></li>
+        <li><a href={htbUrl}>HackTheBox · {site.htb.rank}</a></li>
+        <li><a href={`https://${siteHost}`}>{siteHost}</a></li>
+      </ul>
+    </header>
+
+    <p class="cv-summary">{copy.summary}</p>
+
+    <div class="cv-grid">
+      <div class="cv-main">
+        <section class="cv-sec">
+          <h2 class="cv-h2">{copy.profile}</h2>
+          <ul class="cv-highlights">
+            <li><strong>{site.htb.machines}</strong> {copy.machines} · HackTheBox {site.htb.rank}</li>
+            <li><strong>{writeups.length}</strong> {copy.publicWriteups}</li>
+            <li>{copy.focus}</li>
+          </ul>
+        </section>
+
+        <section class="cv-sec">
+          <h2 class="cv-h2">{copy.education}</h2>
+          <p class="cv-item"><strong>{copy.degree}</strong></p>
+          <p class="cv-sub">{copy.institution}</p>
+        </section>
+
+        <section class="cv-sec">
+          <h2 class="cv-h2">{copy.certsTitle}</h2>
+          {earned.map((cert) => (
+            <p class="cv-item"><strong>{cert.code}</strong> — {cert.name} <span class="cv-sub">· {cert.issuer}</span></p>
+          ))}
+          {goals.length > 0 && <p class="cv-sub cv-goal">{copy.goal}: {goals.join(' · ')}</p>}
+        </section>
+
+        <section class="cv-sec">
+          <h2 class="cv-h2">{copy.writeupsTitle}</h2>
+          <ul class="cv-writeups">
+            {featured.map((w) => (
+              <li>
+                <span class="cv-wname">{w.data.title}</span>
+                <span class="cv-sub"> · {w.data.platform} {w.data.os} · {titleCase(w.data.difficulty)}</span>
+              </li>
+            ))}
+          </ul>
+          <p class="cv-sub cv-more">{copy.seeMore} <a href={`https://${siteHost}`}>{siteHost}</a></p>
+        </section>
+      </div>
+
+      <aside class="cv-side">
+        <section class="cv-sec">
+          <h2 class="cv-h2">{copy.skillsTitle}</h2>
+          {skills.map((group) => (
+            <div class="cv-skill">
+              <p class="cv-skill-title">{group.title[lang]}</p>
+              <p class="cv-skill-items">{group.items[lang].slice(0, 6).join(' · ')}</p>
+            </div>
+          ))}
+        </section>
+
+        <section class="cv-sec">
+          <h2 class="cv-h2">{copy.langsTitle}</h2>
+          <p class="cv-item">{languages}</p>
+        </section>
+
+        <section class="cv-sec">
+          <h2 class="cv-h2">{copy.availTitle}</h2>
+          <p class="cv-item">{availability}</p>
+        </section>
+      </aside>
+    </div>
+  </article>
+</div>
+
+<script>
+  document.getElementById('cv-print')?.addEventListener('click', () => window.print());
+</script>
+
+<style is:global>
+  .cv-page {
+    --ink: #e6edf3;
+    --soft: #9aa4af;
+    --faint: #6b7280;
+    --rule: #232a33;
+    --paper: #0f141a;
+    --brand: var(--accent);
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+  }
+  .cv-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .cv-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.78rem;
+    color: var(--soft);
+  }
+  .cv-back:hover { color: var(--ink); }
+  .cv-print {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    height: 2.3rem;
+    padding: 0 0.95rem;
+    border-radius: 0.5rem;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .cv-print:hover { opacity: 0.9; }
+
+  .cv-doc {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 0.75rem;
+    padding: 2.5rem;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .cv-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.25rem 2rem;
+    border-bottom: 2px solid var(--brand);
+    padding-bottom: 1.25rem;
+  }
+  .cv-name {
+    font-family: var(--font-display, 'Space Grotesk', sans-serif);
+    font-size: 2.1rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+  }
+  .cv-handle { color: var(--brand); font-weight: 600; font-size: 1.4rem; }
+  .cv-role { margin-top: 0.35rem; color: var(--soft); font-size: 0.95rem; }
+  .cv-contact {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.74rem;
+    color: var(--soft);
+    text-align: right;
+    line-height: 1.7;
+  }
+  .cv-contact a { color: var(--soft); }
+  .cv-contact a:hover { color: var(--brand); }
+
+  .cv-summary {
+    margin-top: 1.25rem;
+    font-size: 0.92rem;
+    color: var(--ink);
+    max-width: 46rem;
+  }
+
+  .cv-grid {
+    margin-top: 1.5rem;
+    display: grid;
+    gap: 2rem;
+    grid-template-columns: 1.55fr 1fr;
+  }
+  @media (max-width: 640px) {
+    .cv-grid { grid-template-columns: 1fr; gap: 1.25rem; }
+    .cv-doc { padding: 1.5rem; }
+    .cv-contact { text-align: left; }
+  }
+
+  .cv-sec { margin-bottom: 1.4rem; }
+  .cv-sec:last-child { margin-bottom: 0; }
+  .cv-h2 {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand);
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.3rem;
+    margin-bottom: 0.65rem;
+  }
+  .cv-item { font-size: 0.88rem; }
+  .cv-item strong { color: var(--ink); font-weight: 600; }
+  .cv-sub { color: var(--faint); font-size: 0.8rem; }
+  .cv-goal { margin-top: 0.4rem; }
+
+  .cv-highlights, .cv-writeups { list-style: none; }
+  .cv-highlights li { font-size: 0.88rem; padding: 0.12rem 0; }
+  .cv-highlights strong, .cv-writeups strong { color: var(--brand); }
+  .cv-writeups li { padding: 0.18rem 0; font-size: 0.88rem; }
+  .cv-wname { font-weight: 600; color: var(--ink); }
+  .cv-more { margin-top: 0.55rem; }
+  .cv-more a, .cv-sub a { color: var(--brand); }
+
+  .cv-skill { margin-bottom: 0.6rem; }
+  .cv-skill-title {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.74rem;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .cv-skill-items { font-size: 0.78rem; color: var(--soft); }
+
+  /* ---------- Impresión: documento claro A4, sin cromo del sitio ---------- */
+  @media print {
+    @page { margin: 14mm; size: A4; }
+    body.is-cv { background: #fff !important; }
+    body.is-cv > *:not(main) { display: none !important; }
+    body.is-cv main { display: block !important; }
+    .cv-screen-only { display: none !important; }
+
+    .cv-page {
+      --ink: #111418;
+      --soft: #3a4149;
+      --faint: #5b636b;
+      --rule: #d4d9de;
+      --paper: #fff;
+      --brand: #0a7d32;
+      max-width: none;
+      margin: 0;
+      padding: 0;
+    }
+    .cv-doc {
+      border: none;
+      border-radius: 0;
+      padding: 0;
+    }
+    .cv-doc a { color: inherit; text-decoration: none; }
+    .cv-head { break-inside: avoid; }
+    .cv-sec { break-inside: avoid; }
+  }
+</style>
