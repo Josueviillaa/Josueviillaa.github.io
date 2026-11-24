@@ -161,6 +161,7 @@ const ui = {
     'read.unit': 'min de lectura',
     'cv.nav': 'CV',
     'cv.download': 'Descargar CV',
+    'hero.cta': 'Ver writeups',
 
     'writeup.retired': 'máquina retirada',
     'writeup.active': 'máquina activa',
@@ -304,6 +305,7 @@ const ui = {
     'read.unit': 'min read',
     'cv.nav': 'CV',
     'cv.download': 'Download CV',
+    'hero.cta': 'View write-ups',
 
     'writeup.retired': 'retired machine',
     'writeup.active': 'active machine',

@@ -214,6 +214,33 @@
   .glow-accent { box-shadow: none !important; }
 }
 
+/* Halo de acento al pasar por encima de las tarjetas (no declara `transition`
+   a propósito: la hereda la utilidad `transition` de Tailwind de la tarjeta,
+   así el borde y el desplazamiento siguen animándose). */
+.card-lift:hover {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent),
+    0 18px 44px -18px color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+/* ==========================================================================
+   Barra de scroll fina, estilo terminal (sigue el tema oscuro)
+   ========================================================================== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+  border: 3px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent) 55%, var(--line-strong));
+}
+
 /* ==========================================================================
    Lab interactivo (mini-herramientas client-side)
    ========================================================================== */

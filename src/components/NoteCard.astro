@@ -21,7 +21,7 @@ const href = withBase(lang === 'en' ? `/en/notas/${slug}/` : `/notas/${slug}/`);
 
 <a
   href={href}
-  class="group flex h-full flex-col rounded-lg border border-line bg-surface p-5 transition duration-200 hover:-translate-y-1 hover:border-accent/60 hover:shadow-lg hover:shadow-black/30 sm:p-6"
+  class="card-lift group flex h-full flex-col rounded-lg border border-line bg-surface p-5 transition duration-200 hover:-translate-y-1 hover:border-accent/60 sm:p-6"
 >
   <p class="font-mono text-xs text-faint"><span class="text-accent">#</span> {topic}</p>
   <h3 class="mt-1 text-2xl font-semibold transition-colors group-hover:text-accent">{title}</h3>

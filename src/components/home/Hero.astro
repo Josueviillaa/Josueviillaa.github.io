@@ -3,10 +3,13 @@ import Icon from '../Icon.astro';
 import CopyEmail from '../CopyEmail.astro';
 import HeroTerminal from './HeroTerminal.astro';
 import { site, content, githubUrl, linkedinUrl, htbUrl } from '../../config/site';
-import { getLang } from '../../i18n';
+import { withBase } from '../../lib/url';
+import { getLang, useT } from '../../i18n';
 
 const lang = getLang(Astro.url);
+const t = useT(lang);
 const c = content[lang];
+const writeupsHref = withBase(lang === 'en' ? '/en/writeups/' : '/writeups/');
 ---
 
 <section class="relative overflow-hidden border-b border-line">
@@ -36,6 +39,12 @@ const c = content[lang];
       <p class="mt-4 max-w-xl text-base leading-relaxed text-muted sm:text-lg">{c.pitch}</p>
 
       <div class="mt-9 flex flex-wrap items-center gap-3">
+        <a
+          href={writeupsHref}
+          class="glow-accent inline-flex h-9 items-center gap-2 rounded-md bg-accent px-3.5 font-mono text-[0.8125rem] font-medium text-accent-ink"
+        >
+          {t('hero.cta')} <Icon name="arrow-right" size={15} />
+        </a>
         <a
           href={githubUrl}
           target="_blank"
