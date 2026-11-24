@@ -23,10 +23,12 @@
 :root {
   color-scheme: dark;
 
-  --bg: #0d1117;
-  --surface: #161b22;
-  --surface-raised: #1c2330;
-  --line: #21262d;
+  /* Fondo casi negro (más profundo que el GitHub-dark original): hace que el
+     acento, el halo de los botones y las curvas topográficas resalten más. */
+  --bg: #0a0e14;
+  --surface: #121823;
+  --surface-raised: #1a2130;
+  --line: #20262f;
   --line-strong: #30363d;
 
   --text: #e6edf3;
@@ -154,6 +156,9 @@
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
+  /* Tracking más cerrado en los títulos grandes: aspecto condensado/terminal
+     (la referencia lleva ~-0.045em en el h1). */
+  h1 { letter-spacing: -0.035em; }
 
   p { text-wrap: pretty; }
 
@@ -184,6 +189,30 @@
   transition: text-decoration-color 0.15s;
 }
 .link:hover { text-decoration-color: var(--accent); }
+
+/* Halo de acento para los CTA sólidos: anillo de 1px + resplandor difuso que
+   sigue el color de acento activo (inspirado en la referencia mindsecurity).
+   Se añade a los botones sólidos sin tocar su layout. */
+.glow-accent {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 10px 30px -10px color-mix(in srgb, var(--accent) 65%, transparent);
+  transition: box-shadow 0.22s ease, transform 0.22s ease, opacity 0.15s ease;
+}
+.glow-accent:hover {
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 14px 36px -8px color-mix(in srgb, var(--accent) 80%, transparent);
+  transform: translateY(-1px);
+}
+.glow-accent:active { transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .glow-accent { transition: box-shadow 0.22s ease; }
+  .glow-accent:hover { transform: none; }
+}
+@media print {
+  .glow-accent { box-shadow: none !important; }
+}
 
 /* ==========================================================================
    Lab interactivo (mini-herramientas client-side)
@@ -467,12 +496,15 @@
 .writeup ol > li::marker { font-family: var(--font-mono); font-size: 0.8em; color: var(--text-faint); }
 .writeup li + li { margin-top: 0.4em; }
 
+/* Código en línea: ámbar sobre fondo hundido, como un token de terminal
+   (misma idea que la referencia). El ámbar es fijo, no depende del acento,
+   así se distingue de los enlaces. */
 .writeup :not(pre) > code {
-  padding: 0.1em 0.35em;
-  border: 1px solid var(--line);
+  padding: 0.12em 0.4em;
+  border: 1px solid color-mix(in srgb, var(--warn) 22%, var(--line));
   border-radius: 4px;
-  background: var(--surface);
-  color: var(--text);
+  background: color-mix(in srgb, var(--warn) 7%, var(--bg));
+  color: var(--warn);
   font-size: 0.85em;
   overflow-wrap: anywhere;
 }

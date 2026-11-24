@@ -207,9 +207,18 @@ const languages = facts.find((f) => /idioma|langua/i.test(f.label))?.value ?? ''
     font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
-    transition: opacity 0.15s;
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+      0 10px 30px -10px color-mix(in srgb, var(--accent) 65%, transparent);
+    transition: box-shadow 0.22s ease, transform 0.22s ease, opacity 0.15s;
   }
-  .cv-print:hover { opacity: 0.9; }
+  .cv-print:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 1px var(--accent),
+      0 14px 36px -8px color-mix(in srgb, var(--accent) 80%, transparent);
+  }
 
   .cv-doc {
     background: var(--paper);
