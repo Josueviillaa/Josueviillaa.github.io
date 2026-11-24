@@ -11,9 +11,9 @@ const { n, label, title, intro } = Astro.props;
 ---
 
 <header class="mb-10 flex flex-col gap-3 sm:mb-12">
-  <p class="flex items-center gap-3 font-mono text-xs text-faint">
+  <p class="flex items-center gap-2.5 font-mono text-xs text-faint">
     <span class="font-medium text-accent">{n}</span>
-    <span class="h-px w-8 bg-line-strong" aria-hidden="true"></span>
+    <span class="text-accent/70" aria-hidden="true">$</span>
     <span>{label}</span>
   </p>
   <h2 class="text-3xl font-semibold sm:text-4xl">{title}</h2>

@@ -51,7 +51,7 @@ const cvHref = withBase(lang === 'en' ? '/en/cv/' : '/cv/');
     </a>
 
     <div class="flex items-center gap-4 sm:gap-6">
-      <ul class="hidden items-center gap-6 font-mono text-[0.8125rem] md:flex">
+      <ul class="hidden items-center gap-6 font-mono text-[0.8125rem] lg:flex">
         {
           items.map((item, i) =>
             item.kind === 'anchor' ? (
@@ -108,7 +108,7 @@ const cvHref = withBase(lang === 'en' ? '/en/cv/' : '/cv/');
           aria-controls="nav-menu"
           data-label-open={t('nav.menu')}
           data-label-close={t('nav.close')}
-          class="inline-flex h-9 items-center rounded-md border border-line px-3 font-mono text-xs text-muted transition-colors hover:text-text md:hidden"
+          class="inline-flex h-9 items-center rounded-md border border-line px-3 font-mono text-xs text-muted transition-colors hover:text-text lg:hidden"
         >
           {t('nav.menu')}
         </button>
@@ -116,7 +116,7 @@ const cvHref = withBase(lang === 'en' ? '/en/cv/' : '/cv/');
     </div>
   </nav>
 
-  <div id="nav-menu" hidden class="border-t border-line md:hidden">
+  <div id="nav-menu" hidden class="border-t border-line lg:hidden">
     <ul class="wrap flex flex-col py-2 font-mono text-sm">
       {
         items.map((item, i) =>

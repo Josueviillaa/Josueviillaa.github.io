@@ -86,8 +86,19 @@
   --color-crit-soft: var(--crit-soft);
 
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Títulos en monoespaciada: identidad de terminal, como la referencia (toda
+     la web en mono). Reutiliza JetBrains Mono, que ya carga para el código. */
+  --font-display: "JetBrains Mono", ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  /* Sans de respaldo para piezas que deben quedar "limpias" (p. ej. el CV). */
+  --font-display-sans: "Space Grotesk", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Radios más afilados (aspecto terminal, cercano a la referencia 2–3px). */
+  --radius-sm: 0.1875rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.3125rem;
+  --radius-xl: 0.4375rem;
+  --radius-2xl: 0.625rem;
 }
 
 /* Contenedor común: ancho máximo + gutter lateral mínimo de 16px */
