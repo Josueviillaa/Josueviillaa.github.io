@@ -1,0 +1,502 @@
+---
+/**
+ * Landing "disponible para contratar" — orientada a reclutadores.
+ * Diseño inspirado de cerca en mindsecurity.org: fondo verde-casi-negro,
+ * tipografía monoespaciada (Red Hat Mono), verde vivo, grafo de nodos animado,
+ * botones con halo y radios afilados. Tema PROPIO y fijo (no usa el rotador).
+ * Contenido 100% real (site / content / skills / certs / writeups).
+ */
+import Icon from './Icon.astro';
+import { site, content, githubUrl, linkedinUrl, htbUrl } from '../config/site';
+import { getWriteups, writeupSlug, type Writeup } from '../lib/writeups';
+import { certs } from '../data/certs';
+import { skills } from '../data/skills';
+import { withBase } from '../lib/url';
+import { getLang } from '../i18n';
+
+const lang = getLang(Astro.url);
+const c = content[lang];
+
+const writeups = await getWriteups(lang);
+const featured = writeups.slice(0, 4);
+const earned = certs.filter((cert) => cert.status === 'obtenida');
+const goals = certs.filter((cert) => cert.status !== 'obtenida').map((cert) => cert.code);
+
+const cvHref = withBase(lang === 'en' ? '/en/cv/' : '/cv/');
+const writeupsHref = withBase(lang === 'en' ? '/en/writeups/' : '/writeups/');
+const wHref = (entry: Writeup) =>
+  withBase(lang === 'en' ? `/en/writeups/${writeupSlug(entry.id)}/` : `/writeups/${writeupSlug(entry.id)}/`);
+
+const titleCase = (d: string) => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase();
+
+const copy = {
+  es: {
+    prompt: './contratar',
+    whoami: 'whoami',
+    status: 'Disponible — abierto a nuevas oportunidades',
+    headline: 'Busco mi primer equipo de seguridad ofensiva.',
+    lead: 'Pentester junior con la eJPT y un Máster en Ciberseguridad e IA. Rompo aplicaciones web y Active Directory en laboratorios, documento cada paso en writeups públicos y quiero aportar en un equipo de red / blue / purple team.',
+    contact: 'Contáctame',
+    cv: 'Descargar CV',
+    seeWriteups: 'o lee los writeups',
+    statline: [
+      { n: `${site.htb.machines}+`, l: 'máquinas HTB' },
+      { n: String(writeups.length), l: 'writeups' },
+      { n: 'eJPT', l: 'certificado' },
+      { n: 'MSc', l: 'Ciber + IA' },
+    ],
+    lookingKicker: 'filter --match',
+    lookingTitle: 'Qué busco',
+    roles: 'Puestos',
+    rolesVal: ['Pentester / Red team', 'SOC / Blue team', 'Analista de seguridad', 'Prácticas'],
+    mode: 'Modalidad',
+    modeVal: 'Remoto · Valencia · España',
+    avail: 'Disponibilidad',
+    availVal: 'Incorporación inmediata · CET (UTC+1)',
+    offerKicker: 'cat skills.md',
+    offerTitle: 'Qué aporto',
+    offers: [
+      { h: 'Ofensiva real, no solo teoría', p: 'Web y Active Directory de principio a fin: enumeración, explotación, post-explotación y escalada de privilegios.' },
+      { h: 'Lo documento todo', p: 'Writeups públicos de cada máquina. Escribirlos me obliga a entender de verdad por qué funciona cada paso.' },
+      { h: 'Constancia demostrable', p: '75+ máquinas de HackTheBox, rango Professional. Aprendo rápido, por mi cuenta y en equipo.' },
+      { h: 'Base sólida y en crecimiento', p: 'Máster en Ciberseguridad e IA y la eJPT. Próximo objetivo: eCPPT y OSCP.' },
+    ],
+    stackLabel: 'stack',
+    writeupsKicker: 'ls writeups/',
+    writeupsTitle: 'Writeups destacados',
+    writeupsAll: 'Ver todos los writeups',
+    finalKicker: './contacto',
+    finalTitle: '¿Hablamos?',
+    finalBody: 'Si encajo con lo que buscáis, escríbeme y os cuento más. Respondo por email o LinkedIn.',
+  },
+  en: {
+    prompt: './hire',
+    whoami: 'whoami',
+    status: 'Available — open to new opportunities',
+    headline: 'Looking for my first offensive-security team.',
+    lead: 'Junior pentester with the eJPT and an MSc in Cybersecurity & AI. I break web apps and Active Directory in labs, document every step in public write-ups, and want to contribute on a red / blue / purple team.',
+    contact: 'Get in touch',
+    cv: 'Download CV',
+    seeWriteups: 'or read the write-ups',
+    statline: [
+      { n: `${site.htb.machines}+`, l: 'HTB machines' },
+      { n: String(writeups.length), l: 'write-ups' },
+      { n: 'eJPT', l: 'certified' },
+      { n: 'MSc', l: 'Cyber + AI' },
+    ],
+    lookingKicker: 'filter --match',
+    lookingTitle: 'What I’m looking for',
+    roles: 'Roles',
+    rolesVal: ['Pentester / Red team', 'SOC / Blue team', 'Security analyst', 'Internship'],
+    mode: 'Setup',
+    modeVal: 'Remote · Valencia · Spain',
+    avail: 'Availability',
+    availVal: 'Immediate · CET (UTC+1)',
+    offerKicker: 'cat skills.md',
+    offerTitle: 'What I bring',
+    offers: [
+      { h: 'Real offense, not just theory', p: 'Web and Active Directory end to end: enumeration, exploitation, post-exploitation and privilege escalation.' },
+      { h: 'I document everything', p: 'Public write-ups of every machine. Writing them forces me to truly understand why each step works.' },
+      { h: 'Proven consistency', p: '75+ HackTheBox machines, Professional rank. I learn fast, on my own and in a team.' },
+      { h: 'Solid, growing foundation', p: 'MSc in Cybersecurity & AI and the eJPT. Next up: eCPPT and OSCP.' },
+    ],
+    stackLabel: 'stack',
+    writeupsKicker: 'ls writeups/',
+    writeupsTitle: 'Selected write-ups',
+    writeupsAll: 'See all write-ups',
+    finalKicker: './contact',
+    finalTitle: 'Let’s talk',
+    finalBody: 'If I’m a fit for what you need, drop me a line and I’ll tell you more. I reply by email or LinkedIn.',
+  },
+}[lang];
+---
+
+<div class="hire-root">
+  <!-- ===================== HERO ===================== -->
+  <header class="hhero">
+    <canvas class="hnodes" aria-hidden="true"></canvas>
+    <div class="hhero-wrap">
+      <p class="hstatus"><span class="hdot" aria-hidden="true"></span>{copy.status}</p>
+
+      <p class="hpromptline"><span class="huser">{site.handle}@josue</span><span class="hpath">:~$</span> {copy.prompt}</p>
+
+      <h1 class="hh1">{copy.headline}</h1>
+      <p class="hrole">{c.role}</p>
+      <p class="hlead">{copy.lead}</p>
+
+      <div class="hctas">
+        <a class="hbtn hbtn-primary" href={`mailto:${site.email}`}>
+          <Icon name="mail" size={16} /> {copy.contact}
+        </a>
+        <a class="hbtn hbtn-secondary" href={cvHref}>
+          <Icon name="download" size={16} /> {copy.cv}
+        </a>
+        <a class="hbtn-link" href={writeupsHref}>{copy.seeWriteups} →</a>
+      </div>
+
+      <dl class="hstatline">
+        {copy.statline.map((s) => (
+          <div>
+            <dt>{s.n}</dt>
+            <dd>{s.l}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  </header>
+
+  <!-- ===================== QUÉ BUSCO ===================== -->
+  <section class="hsec">
+    <div class="hinner">
+      <p class="hkicker"><span class="hk-n">01</span><span class="hk-d">$</span>{copy.lookingKicker}</p>
+      <h2 class="hh2">{copy.lookingTitle}</h2>
+      <div class="hlook">
+        <div class="hpanel">
+          <p class="hpanel-k">{copy.roles}</p>
+          <ul class="hlist">
+            {copy.rolesVal.map((r) => (<li>{r}</li>))}
+          </ul>
+        </div>
+        <div class="hpanel">
+          <p class="hpanel-k">{copy.mode}</p>
+          <p class="hpanel-v">{copy.modeVal}</p>
+        </div>
+        <div class="hpanel">
+          <p class="hpanel-k">{copy.avail}</p>
+          <p class="hpanel-v">{copy.availVal}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== QUÉ APORTO ===================== -->
+  <section class="hsec">
+    <div class="hinner">
+      <p class="hkicker"><span class="hk-n">02</span><span class="hk-d">$</span>{copy.offerKicker}</p>
+      <h2 class="hh2">{copy.offerTitle}</h2>
+      <div class="hcards">
+        {copy.offers.map((o) => (
+          <div class="hpanel">
+            <h3 class="hcard-h">{o.h}</h3>
+            <p class="hcard-p">{o.p}</p>
+          </div>
+        ))}
+      </div>
+      <p class="hpanel-k hstack-k">{copy.stackLabel}</p>
+      <div class="hchips">
+        {skills.map((g) => (<span class="hchip">{g.title[lang]}</span>))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== WRITEUPS ===================== -->
+  <section class="hsec">
+    <div class="hinner">
+      <p class="hkicker"><span class="hk-n">03</span><span class="hk-d">$</span>{copy.writeupsKicker}</p>
+      <h2 class="hh2">{copy.writeupsTitle}</h2>
+      <ul class="hwus">
+        {featured.map((w) => (
+          <li>
+            <a class="hpanel hwu" href={wHref(w)}>
+              <span class="hwu-meta">{w.data.platform} · {w.data.os} · {titleCase(w.data.difficulty)}</span>
+              <span class="hwu-title">{w.data.title}</span>
+              <span class="hwu-arrow">→</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <a class="hbtn-link" href={writeupsHref}>{copy.writeupsAll} →</a>
+    </div>
+  </section>
+
+  <!-- ===================== CTA FINAL ===================== -->
+  <section class="hsec hfinal">
+    <div class="hinner">
+      <p class="hkicker hk-center"><span class="hk-d">$</span>{copy.finalKicker}</p>
+      <h2 class="hh2 hh2-center">{copy.finalTitle}</h2>
+      <p class="hfinal-body">{copy.finalBody}</p>
+      <div class="hctas hctas-center">
+        <a class="hbtn hbtn-primary" href={`mailto:${site.email}`}>
+          <Icon name="mail" size={16} /> {site.email}
+        </a>
+        <a class="hbtn hbtn-secondary" href={cvHref}>
+          <Icon name="download" size={16} /> {copy.cv}
+        </a>
+      </div>
+      <div class="hsocials">
+        <a href={githubUrl} target="_blank" rel="noopener noreferrer"><Icon name="github" size={16} /> GitHub</a>
+        <a href={linkedinUrl} target="_blank" rel="noopener noreferrer"><Icon name="linkedin" size={16} /> LinkedIn</a>
+        <a href={htbUrl} target="_blank" rel="noopener noreferrer"><Icon name="htb" size={16} /> HackTheBox</a>
+      </div>
+    </div>
+  </section>
+</div>
+
+<style is:global>
+  /* La landing tiene su PROPIO tema (verde casi negro, estilo mindsecurity):
+     se aísla del rotador de acento y del fondo del resto del sitio. */
+  body.is-hire { background: #050a08 !important; }
+  body.is-hire::before { display: none !important; }
+
+  .hire-root {
+    --hbg: #050a08;
+    --hpanel: rgba(8, 19, 14, 0.55);
+    --hfg: #bfe9d2;
+    --hhead: #ecfff5;
+    --hgreen: #35f29a;
+    --hlink: #6dffb8;
+    --hborder: #17382a;
+    --hfaint: #5f8f76;
+    --hfont: "Red Hat Mono", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+    color: var(--hfg);
+    font-family: var(--hfont);
+    font-size: 0.97rem;
+    line-height: 1.65;
+    letter-spacing: -0.01em;
+  }
+  .hire-root ::selection { background: rgba(53, 242, 154, 0.25); color: var(--hhead); }
+
+  .hinner,
+  .hhero-wrap {
+    width: 100%;
+    max-width: 64rem;
+    margin-inline: auto;
+    padding-inline: clamp(1rem, 4vw, 2rem);
+  }
+
+  /* ---------- HERO ---------- */
+  .hhero {
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid var(--hborder);
+  }
+  .hnodes {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    opacity: 0.9;
+    mask-image: radial-gradient(130% 110% at 70% 0%, #000 35%, transparent 80%);
+    -webkit-mask-image: radial-gradient(130% 110% at 70% 0%, #000 35%, transparent 80%);
+  }
+  .hhero-wrap {
+    position: relative;
+    z-index: 1;
+    padding-top: clamp(4.5rem, 12vh, 8rem);
+    padding-bottom: clamp(4.5rem, 12vh, 8rem);
+  }
+  .hstatus {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    border: 1px solid var(--hborder);
+    border-radius: 2px;
+    background: rgba(8, 19, 14, 0.6);
+    padding: 0.35rem 0.75rem;
+    font-size: 0.75rem;
+    color: var(--hfg);
+  }
+  .hdot {
+    width: 0.5rem; height: 0.5rem; border-radius: 999px; background: var(--hgreen);
+    box-shadow: 0 0 10px 0 var(--hgreen);
+  }
+  .hpromptline { margin-top: 2rem; font-size: 0.85rem; color: var(--hfaint); }
+  .huser { color: var(--hgreen); }
+  .hpath { color: var(--hfaint); }
+
+  .hh1 {
+    margin-top: 0.75rem;
+    font-family: var(--hfont);
+    font-size: clamp(2.2rem, 6vw, 3.4rem);
+    font-weight: 700;
+    line-height: 1.04;
+    letter-spacing: -0.045em;
+    color: var(--hhead);
+    max-width: 18ch;
+    text-wrap: balance;
+  }
+  .hrole { margin-top: 1rem; color: var(--hgreen); font-size: 0.95rem; }
+  .hlead { margin-top: 1rem; max-width: 56ch; color: var(--hfg); }
+
+  /* ---------- Botones estilo mindsecurity ---------- */
+  .hctas { margin-top: 2rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.85rem; }
+  .hctas-center { justify-content: center; }
+  .hbtn {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    border-radius: 2px;
+    padding: 0.75rem 1.15rem;
+    font-family: var(--hfont);
+    font-size: 0.875rem;
+    font-weight: 700;
+    transition: box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease;
+  }
+  .hbtn-primary {
+    background: var(--hgreen);
+    color: #030604;
+    box-shadow: 0 0 0 1px var(--hgreen), 0 0 26px -4px rgba(53, 242, 154, 0.7);
+  }
+  .hbtn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 0 1px var(--hgreen), 0 0 34px -2px rgba(53, 242, 154, 0.85); }
+  .hbtn-secondary {
+    background: rgba(8, 19, 14, 0.6);
+    color: var(--hhead);
+    border: 1px solid var(--hborder);
+    font-weight: 500;
+  }
+  .hbtn-secondary:hover { border-color: var(--hgreen); color: var(--hgreen); }
+  .hbtn-link { color: var(--hlink); font-size: 0.85rem; font-weight: 500; }
+  .hbtn-link:hover { color: var(--hhead); }
+
+  /* ---------- Statline del hero ---------- */
+  .hstatline {
+    margin-top: 2.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem 2.5rem;
+    border-top: 1px solid var(--hborder);
+    padding-top: 1.5rem;
+  }
+  .hstatline dt { font-size: 1.6rem; font-weight: 700; color: var(--hhead); line-height: 1; }
+  .hstatline dd { margin-top: 0.3rem; font-size: 0.72rem; color: var(--hfaint); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* ---------- Secciones ---------- */
+  .hsec { border-bottom: 1px solid var(--hborder); padding-block: clamp(3.5rem, 8vh, 6rem); }
+  .hsec:last-child { border-bottom: 0; }
+  .hkicker { display: flex; align-items: center; gap: 0.6rem; font-size: 0.78rem; color: var(--hfaint); }
+  .hk-center { justify-content: center; }
+  .hk-n { color: var(--hgreen); font-weight: 700; }
+  .hk-d { color: var(--hgreen); }
+  .hh2 {
+    margin-top: 0.7rem;
+    font-family: var(--hfont);
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    color: var(--hhead);
+  }
+  .hh2-center { text-align: center; }
+
+  /* Paneles (cajas) */
+  .hpanel {
+    border: 1px solid var(--hborder);
+    border-radius: 3px;
+    background: var(--hpanel);
+    padding: 1.4rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .hpanel-k { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--hgreen); }
+  .hpanel-v { margin-top: 0.6rem; color: var(--hfg); }
+
+  .hlook { margin-top: 2.25rem; display: grid; gap: 1rem; grid-template-columns: repeat(3, 1fr); }
+  .hlist { margin-top: 0.6rem; list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+  .hlist li { position: relative; padding-left: 1.1rem; color: var(--hfg); }
+  .hlist li::before { content: "▹"; position: absolute; left: 0; color: var(--hgreen); }
+
+  .hcards { margin-top: 2.25rem; display: grid; gap: 1rem; grid-template-columns: repeat(2, 1fr); }
+  .hcard-h { font-size: 1.05rem; font-weight: 700; color: var(--hhead); }
+  .hcard-p { margin-top: 0.5rem; font-size: 0.9rem; color: var(--hfg); }
+
+  .hstack-k { margin-top: 2.5rem; }
+  .hchips { margin-top: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .hchip {
+    border: 1px solid var(--hborder); border-radius: 2px; background: rgba(8, 19, 14, 0.5);
+    padding: 0.3rem 0.65rem; font-size: 0.78rem; color: var(--hfg);
+  }
+
+  .hwus { margin-top: 2.25rem; list-style: none; display: grid; gap: 1rem; grid-template-columns: repeat(2, 1fr); }
+  .hwu { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0.3rem 1rem; }
+  .hwu:hover { border-color: var(--hgreen); box-shadow: 0 0 24px -10px rgba(53, 242, 154, 0.5); transform: translateY(-2px); }
+  .hwu-meta { grid-column: 1; font-size: 0.72rem; color: var(--hfaint); }
+  .hwu-title { grid-column: 1; grid-row: 2; font-size: 1.05rem; font-weight: 700; color: var(--hhead); }
+  .hwu:hover .hwu-title { color: var(--hgreen); }
+  .hwu-arrow { grid-column: 2; grid-row: 1 / span 2; color: var(--hgreen); font-size: 1.1rem; }
+
+  .hfinal { text-align: center; }
+  .hfinal-body { margin: 1rem auto 0; max-width: 46ch; color: var(--hfg); }
+  .hfinal .hctas { margin-top: 2rem; }
+  .hsocials { margin-top: 1.75rem; display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem; font-size: 0.85rem; }
+  .hsocials a { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--hfg); }
+  .hsocials a:hover { color: var(--hgreen); }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 760px) {
+    .hlook { grid-template-columns: 1fr; }
+    .hcards { grid-template-columns: 1fr; }
+    .hwus { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hbtn, .hpanel, .hwu { transition: none; }
+  }
+</style>
+
+<script>
+  // Grafo de nodos animado del hero (estilo mindsecurity): puntos que flotan
+  // y se unen con líneas cuando están cerca. Verde sobre fondo casi negro.
+  (() => {
+    const canvas = document.querySelector<HTMLCanvasElement>('.hnodes');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    let w = 0, h = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    type Node = { x: number; y: number; vx: number; vy: number };
+    let nodes: Node[] = [];
+
+    function size() {
+      const r = canvas!.getBoundingClientRect();
+      w = r.width; h = r.height;
+      canvas!.width = Math.max(1, Math.floor(w * dpr));
+      canvas!.height = Math.max(1, Math.floor(h * dpr));
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const count = Math.min(70, Math.max(26, Math.round((w * h) / 22000)));
+      nodes = Array.from({ length: count }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.22,
+        vy: (Math.random() - 0.5) * 0.22,
+      }));
+    }
+
+    const LINK = 150;
+    function frame() {
+      ctx!.clearRect(0, 0, w, h);
+      for (const n of nodes) {
+        n.x += n.vx; n.y += n.vy;
+        if (n.x < 0 || n.x > w) n.vx *= -1;
+        if (n.y < 0 || n.y > h) n.vy *= -1;
+      }
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodes[i], b = nodes[j];
+          const dx = a.x - b.x, dy = a.y - b.y;
+          const d = Math.hypot(dx, dy);
+          if (d < LINK) {
+            const al = (1 - d / LINK) * 0.22;
+            ctx!.strokeStyle = `rgba(53, 242, 154, ${al})`;
+            ctx!.lineWidth = 1;
+            ctx!.beginPath();
+            ctx!.moveTo(a.x, a.y);
+            ctx!.lineTo(b.x, b.y);
+            ctx!.stroke();
+          }
+        }
+      }
+      for (const n of nodes) {
+        ctx!.fillStyle = 'rgba(109, 255, 184, 0.75)';
+        ctx!.beginPath();
+        ctx!.arc(n.x, n.y, 1.6, 0, Math.PI * 2);
+        ctx!.fill();
+      }
+      if (!reduce) raf = requestAnimationFrame(frame);
+    }
+
+    let raf = 0;
+    const ro = new ResizeObserver(() => { size(); if (reduce) frame(); });
+    ro.observe(canvas);
+    size();
+    if (reduce) frame();
+    else raf = requestAnimationFrame(frame);
+  })();
+</script>
